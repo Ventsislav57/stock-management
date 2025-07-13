@@ -59,8 +59,6 @@ export async function POST(req) {
 
             if (existing) {
                 // Ако има, актуализирай количеството (сумирай)
-                console.log(typeof existing.Qtty, typeof item.Qtty);
-                
                 existing.Qtty = parseFloat(existing.Qtty || 0) + parseFloat(item.Qtty || 0);
 
                 // Ако искаш, можеш да актуализираш и други полета по избор

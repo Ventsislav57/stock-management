@@ -163,20 +163,20 @@ export default function StockInPage() {
         <div className="w-full flex flex-col items-center justify-center h-full">
           {productDetails ? (
             <div className="relative w-[80%] h-[60vh] overflow-auto bg-gray-900/90 border-2 border-white rounded-lg p-5 text-white">
-              <div
-                className="absolute left-5 top-6 cursor-pointer transition-all duration-300 hover:ml-[-5px]"
-                onClick={() => setProductDetails(null)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  height="24px"
-                  viewBox="0 -960 960 960"
-                  width="24px"
-                  fill="#FFFFFF"
+                <div
+                    className="absolute left-5 top-6 cursor-pointer transition-all duration-300 hover:ml-[-5px]"
+                    onClick={() => setProductDetails(null)}
                 >
-                  <path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" />
-                </svg>
-              </div>
+                    <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    height="24px"
+                    viewBox="0 -960 960 960"
+                    width="24px"
+                    fill="#FFFFFF"
+                    >
+                    <path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" />
+                    </svg>
+                </div>
               <h2 className="text-2xl font-bold mb-4 border-b-2 border-white text-center pb-4">
                 Детайли за продукта
               </h2>
@@ -321,11 +321,11 @@ export default function StockInPage() {
             <>
               <div
                 className={`cursor-pointer w-[300px] h-[300px] border-4 rounded-xl flex flex-col items-center justify-center text-center p-4 transition-all duration-200
-                                        ${
-                                          dragActive
-                                            ? "border-blue-400 bg-blue-900/30"
-                                            : "border-dashed border-white/30 hover:border-white hover:bg-white/10"
-                                        }`}
+                ${
+                    dragActive
+                    ? "border-blue-400 bg-blue-900/30"
+                    : "border-dashed border-white/30 hover:border-white hover:bg-white/10"
+                }`}
                 onClick={() => inputRef.current.click()}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -389,7 +389,7 @@ export default function StockInPage() {
               </div>
               <div className="h-[60vh] overflow-auto bg-gray-900/90 border-2 border-white rounded-lg">
                 {/* Header */}
-                <div className="grid grid-cols-12 items-center text-white p-4 border-b-6 cursor-default bg-white/10 font-semibold">
+                <div className="sticky top-0 grid grid-cols-12 items-center text-white p-4 border-b-2 cursor-default bg-gray-900/90 font-semibold">
                     <div className="col-span-2 border-r-2 border-white text-center">
                         <span>Име на продукта</span>
                     </div>

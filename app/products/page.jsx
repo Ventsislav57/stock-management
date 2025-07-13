@@ -49,8 +49,6 @@ export default function Products() {
         debounceTimeout.current = setTimeout(() => {
             const fetchData = async () => {
                 setLoading(true);
-                console.log(searchParams.date);
-                
                 try {
                     const query = new URLSearchParams({
                         limit,

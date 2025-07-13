@@ -64,8 +64,6 @@ export default function StockOutPage() {
 
 
         setReports(normalized);
-        console.log(normalized);
-        
         } catch (err) {
 
         }
@@ -156,20 +154,20 @@ export default function StockOutPage() {
         <div className="w-full flex flex-col items-center justify-center h-full">
           {productDetails ? (
             <div className="relative w-[80%] h-[60vh] overflow-auto bg-gray-900/90 border-2 border-white rounded-lg p-5 text-white">
-              <div
-                className="absolute left-5 top-6 cursor-pointer transition-all duration-300 hover:ml-[-5px]"
-                onClick={() => setProductDetails(null)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  height="24px"
-                  viewBox="0 -960 960 960"
-                  width="24px"
-                  fill="#FFFFFF"
+                <div
+                    className="absolute left-5 top-6 cursor-pointer transition-all duration-300 hover:ml-[-5px]"
+                    onClick={() => setProductDetails(null)}
                 >
-                  <path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" />
-                </svg>
-              </div>
+                    <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    height="24px"
+                    viewBox="0 -960 960 960"
+                    width="24px"
+                    fill="#FFFFFF"
+                    >
+                    <path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" />
+                    </svg>
+                </div>
               <h2 className="text-2xl font-bold mb-4 border-b-2 border-white text-center pb-4">
                 Детайли за продадения продукт
               </h2>
@@ -312,32 +310,33 @@ export default function StockOutPage() {
             </div>
           ) : reports.length === 0 ? (
             <>
-              <div
-                className={`cursor-pointer w-[300px] h-[300px] border-4 rounded-xl flex flex-col items-center justify-center text-center p-4 transition-all duration-200
-                ${
-                  dragActive
-                    ? "border-blue-400 bg-blue-900/30"
-                    : "border-dashed border-white/30 hover:border-white hover:bg-white/10"
-                }`}
-                onClick={() => inputRef.current.click()}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <CloudUpload className="w-12 h-12 text-white/60 mb-4" />
-                <p className="text-white/80">
-                  Пуснете тук XML файл
-                  <br />
-                  или кликнете, за да изберете
-                </p>
-                <input
-                  type="file"
-                  accept=".xml"
-                  className="hidden"
-                  ref={inputRef}
-                  onChange={handleInputChange}
-                />
-              </div>
+                <p className="text-3xl border-b-2 text-white pb-2">Качване на XML файл</p>
+                <div
+                    className={`mt-5 cursor-pointer w-[300px] h-[300px] border-4 rounded-xl flex flex-col items-center justify-center text-center p-4 transition-all duration-200
+                    ${
+                    dragActive
+                        ? "border-blue-400 bg-blue-900/30"
+                        : "border-dashed border-white/30 hover:border-white hover:bg-white/10"
+                    }`}
+                    onClick={() => inputRef.current.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                >
+                    <CloudUpload className="w-12 h-12 text-white/60 mb-4" />
+                    <p className="text-white/80">
+                        Пуснете тук XML файл
+                        <br />
+                        или кликнете, за да изберете
+                    </p>
+                    <input
+                        type="file"
+                        accept=".xml"
+                        className="hidden"
+                        ref={inputRef}
+                        onChange={handleInputChange}
+                    />
+                </div>
             </>
           ) : (
             <div className="p-20 ">
@@ -382,7 +381,7 @@ export default function StockOutPage() {
               </div>
               <div className="h-[60vh] overflow-auto bg-gray-900/90 border-2 border-white rounded-lg">
                 {/* Header */}
-                <div className="grid grid-cols-12 items-center text-white p-4 border-b-6 cursor-default bg-white/10 font-semibold">
+                <div className="sticky top-0 grid grid-cols-12 items-center text-white p-4 border-b-2 cursor-default bg-gray-900/90 font-semibold">
                     <div className="col-span-2 border-r-2 border-white text-center">
                         <span>Име на продукта</span>
                     </div>
@@ -407,10 +406,10 @@ export default function StockOutPage() {
                 {reports.map((report, index) => (
                   <div
                     key={index}
-                    className="grid grid-cols-12 items-center text-white py-4 border-b-2 bg-white/10 hover:bg-white/30 cursor-pointer"
+                    className="grid grid-cols-12 items-center text-white p-4 border-b-2 bg-white/10 hover:bg-white/30 cursor-pointer"
                     onClick={() => setProductDetails(report)}
                   >
-                    <div className="col-span-2 border-r-2 border-white text-center">
+                    <div className="col-span-2 border-r-2 border-white text-center px-3">
                       <span>{report.GoodName}</span>
                     </div>
                     <div className="col-span-2 border-r-2 border-white text-center">

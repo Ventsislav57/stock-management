@@ -12,7 +12,6 @@ async function findUserByUsernameAndPassword(username, password) {
         const db = client.db("test");
         const user = await db.collection("admins").findOne({ username });
         const allUsers = await db.collection("admins").find().toArray();
-        console.log('всички потребители -> ', allUsers);
         
         if (!user) return null;
 
@@ -42,11 +41,8 @@ const handler = NextAuth({
             password: { label: "Парола", type: "password", placeholder: "Парола" },
         },
         async authorize(credentials) {
-            console.log("Credentials received:", credentials);
             const user = await findUserByUsernameAndPassword(credentials.username, credentials.password);
-            console.log("User found:", user);
             if (user) return user;
-            console.log("Authorization failed");
             return null;
         }
 

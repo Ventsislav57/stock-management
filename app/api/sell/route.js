@@ -47,16 +47,12 @@ export async function POST(req) {
                 existing.Qtty -= 1;
                 existing.Date = item.Date;
                 await existing.save();
-                console.log('refresh count -> ', existing);
             } else {
-                console.log('nqma takyv, bate!!!');
             }
         }
 
         return new Response(JSON.stringify({ message: "Успешно обработени записи", status: "success" }),{ status: 200 });
     } catch (error) {
-        console.log(error);
-        
         return new Response(JSON.stringify({ status: "error", message: "Грешка при качване"}), { status: 500 } );
     }
 }
