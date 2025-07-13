@@ -11,6 +11,8 @@ async function findUserByUsernameAndPassword(username, password) {
         await client.connect();
         const db = client.db("test");
         const user = await db.collection("admins").findOne({ username });
+        console.log(user);
+        
         if (!user) return null;
 
         const isValid = await bcrypt.compare(password, user.password);
