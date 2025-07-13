@@ -47,8 +47,8 @@ const SideNav = () => {
                     <span className="absolute top-2 right-5 text-2xl" onClick={() => setIsMenuOpen(!isMenuOpen)}>X</span>
                     <ul className="w-full flex flex-col gap-5 justify-start mt-20 px-5">
                         <Link className="text-xl" href="/products">📦 Продукти</Link>
-                        <Link className="text-xl" href="/stock-out">💸 Продажби</Link>
-                        <Link className="text-xl" href="/stock-in">📥 Заприхождаване</Link>
+                        <Link className="text-xl" href="/stock-out">💸 За Продажби</Link>
+                        <Link className="text-xl" href="/stock-in">📥 За Доставки </Link>
                     </ul>
 
                     <button
@@ -65,8 +65,8 @@ const SideNav = () => {
             <div className="hidden lg:block w-full px-5 text-white">
                 <ul className="w-full flex flex-col gap-5 justify-start">
                     <Link className="text-md 2xl:text-xl" href="/products">📦 Продукти</Link>
-                    <Link className="text-md 2xl:text-xl" href="/stock-out">💸 Продажби</Link>
-                    <Link className="text-md 2xl:text-xl" href="/stock-in">📥 Заприхождаване</Link>
+                    <Link className="text-md 2xl:text-xl" href="/stock-out">💸 За Продажби</Link>
+                    <Link className="text-md 2xl:text-xl" href="/stock-in">📥 За Доставки </Link>
                 </ul>
             </div>
 
