@@ -11,7 +11,7 @@ async function findUserByUsernameAndPassword(username, password) {
         await client.connect();
         const db = client.db("test");
         const user = await db.collection("admins").findOne({ username });
-        const allUsers = await db.collection("admins").find();
+        const allUsers = await db.collection("admins").find().toArray();
         console.log('всички потребители -> ', allUsers);
         
         if (!user) return null;
