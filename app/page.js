@@ -17,7 +17,7 @@ export default function Home() {
     }, [session, status, router]);
 
     if (status === "loading") {
-        return <div className="fixed inset-0 flex items-center justify-center h-screen w-screen"><span className="products-loader"></span></div>;
+        return <div className="h-screen w-screen"><span className="products-loader"></span></div>;
     }
 
     if (!session) {
