@@ -3,23 +3,25 @@ import { useState, useEffect, useRef } from "react";
 import SideNav from "../navigation/SideNav";
 
 const HomePage = () => {
-    const [bgnValue, setBgnValue] = useState("");
-    const [listening, setListening] = useState(false);
+    const [ bgnValue, setBgnValue ] = useState("");
+    const [ listening, setListening ] = useState(false);
+    const [ isChrome, setIsChrome ] = useState(false);
     const recognitionRef = useRef(null);
     const exchangeRate = 1.95583;
 
     useEffect(() => {
         if (typeof window === "undefined") return;
 
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isChrome = /chrome/.test(userAgent) && !/edge|edg|opr|opera|brave/.test(userAgent);
+        const isBrave = (navigator.brave && typeof navigator.brave.isBrave === "function" && navigator.brave.isBrave()) || userAgent.includes("brave");
+        setIsChrome(isChrome && !isBrave);
+
+        if (!isChrome) return;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.warn("SpeechRecognition API not supported");
-            return;
-        }
+        if (!SpeechRecognition) return;
 
         const recognition = new SpeechRecognition();
-
-        console.log(recognition);
         
         recognition.lang = "bg-BG";
         recognition.interimResults = false;
@@ -33,7 +35,6 @@ const HomePage = () => {
         };
 
         recognition.onerror = (event) => {
-            console.error("Speech recognition error:", event.error);
             setListening(false);
         };
 
@@ -83,18 +84,19 @@ const HomePage = () => {
                             onChange={(e) => setBgnValue(e.target.value)}
                             className="w-full px-6 py-3 rounded-full bg-white text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                         />
-
-                        <button
-                            onClick={startListening}
-                            disabled={listening}
-                            className={`mt-2 w-full py-3 rounded-full text-lg font-medium cursor-pointer ${
-                                listening
+                         {isChrome && 
+                            <button
+                                onClick={startListening}
+                                disabled={listening}
+                                className={`mt-2 w-full py-3 rounded-full text-lg font-medium cursor-pointer ${
+                                    listening
                                     ? "bg-gray-400 cursor-not-allowed"
                                     : "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-                            }`}
-                        >
-                            {listening ? "Слуша..." : "🎤 Говори"}
-                        </button>
+                                }`}
+                            >
+                                {listening ? "Слуша..." : "🎤 Говори"}
+                            </button>
+                        }
 
                         <div className="text-center mt-4">
                             <p className="text-white text-xl font-medium">
