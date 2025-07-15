@@ -18,6 +18,9 @@ const HomePage = () => {
         }
 
         const recognition = new SpeechRecognition();
+
+        console.log(recognition);
+        
         recognition.lang = "bg-BG";
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
@@ -84,7 +87,7 @@ const HomePage = () => {
                         <button
                             onClick={startListening}
                             disabled={listening}
-                            className={`mt-2 w-full py-3 rounded-full text-lg font-medium ${
+                            className={`mt-2 w-full py-3 rounded-full text-lg font-medium cursor-pointer ${
                                 listening
                                     ? "bg-gray-400 cursor-not-allowed"
                                     : "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
