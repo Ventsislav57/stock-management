@@ -30,7 +30,7 @@ const HomePage = () => {
                             type="number"
                             min="0"
                             step="any"
-                            placeholder="например 100"
+                            placeholder="Въведи лева"
                             value={bgnValue}
                             onChange={(e) => setBgnValue(e.target.value)}
                             className="w-full px-6 py-3 rounded-full bg-white text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
