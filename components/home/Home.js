@@ -1,10 +1,55 @@
-import { useState } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import SideNav from "../navigation/SideNav";
 
 const HomePage = () => {
     const [bgnValue, setBgnValue] = useState("");
+    const [listening, setListening] = useState(false);
+    const recognitionRef = useRef(null);
     const exchangeRate = 1.95583;
-    
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.warn("SpeechRecognition API not supported");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = "bg-BG";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            const numberFromVoice = transcript.replace(/[^0-9.]/g, "").trim();
+            if (numberFromVoice) setBgnValue(numberFromVoice);
+            setListening(false);
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+            setListening(false);
+        };
+
+        recognition.onend = () => {
+            setListening(false);
+        };
+
+        recognitionRef.current = recognition;
+    }, []);
+
+
+
+    const startListening = () => {
+        if (recognitionRef.current) {
+            setListening(true);
+            recognitionRef.current.start();
+        }
+    };
+
     const calculateEuro = () => {
         const num = parseFloat(bgnValue);
         if (isNaN(num)) return "0.00";
@@ -35,6 +80,18 @@ const HomePage = () => {
                             onChange={(e) => setBgnValue(e.target.value)}
                             className="w-full px-6 py-3 rounded-full bg-white text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                         />
+
+                        <button
+                            onClick={startListening}
+                            disabled={listening}
+                            className={`mt-2 w-full py-3 rounded-full text-lg font-medium ${
+                                listening
+                                    ? "bg-gray-400 cursor-not-allowed"
+                                    : "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+                            }`}
+                        >
+                            {listening ? "Слуша..." : "🎤 Говори"}
+                        </button>
 
                         <div className="text-center mt-4">
                             <p className="text-white text-xl font-medium">
