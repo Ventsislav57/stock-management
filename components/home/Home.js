@@ -16,11 +16,11 @@ const HomePage = () => {
             <SideNav />
 
             <div className="flex-1 p-6 lg:p-10 text-white overflow-y-auto">
-                <h1 className="text-center text-4xl font-bold border-b border-white pb-4">
+                <h1 className="text-center text-2xl md:text-4xl font-bold border-b border-white pb-4">
                     Калкулатор BGN → EUR
                 </h1>
 
-                <div className="max-w-md mx-auto mt-16 border border-white/20 bg-white/10 p-8 rounded-2xl shadow-xl backdrop-blur-md">
+                <div className="max-w-md mx-auto mt-10 border border-white/20 bg-white/10 p-8 rounded-2xl shadow-xl backdrop-blur-md">
                     <div className="flex flex-col gap-6">
                         <label className="text-lg font-medium text-center">
                             Въведи сума в лева (BGN):

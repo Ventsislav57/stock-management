@@ -10,9 +10,8 @@ const SideNav = () => {
     const [ isMenuOpen, setIsMenuOpen ] = useState(false); 
 
     
-
     return (
-        <div className="h-[100px] lg:h-screen bg-white/10 w-full lg:w-[20%] px-5 lg:px-0 flex lg:flex-col items-center justify-between border-b-2 lg:border-r-2 border-gray-400">
+        <div className="h-[100px] lg:h-screen bg-white/10 w-full lg:w-[20%] px-5 lg:px-0 flex lg:flex-col items-center justify-between border-b-2 lg:border-r-2 border-gray-400 z-20 text-black">
             <div className="flex flex-col items-center justify-center py-5 lg:pt-5">
                 <Link href="/">
                     <img 
@@ -43,7 +42,7 @@ const SideNav = () => {
             </div>
 
             {isMenuOpen &&
-                <div className="fixed inset-0 w-2/3 ml-auto bg-white/90 flex lg:hidden flex-col justify-between py-5 items-center border-l-2 border-gray-500">
+                <div className="fixed inset-0 w-2/3 ml-auto bg-white flex lg:hidden flex-col justify-between py-5 items-center border-l-2 border-gray-500 z-20">
                     <span className="absolute top-2 right-5 text-2xl" onClick={() => setIsMenuOpen(!isMenuOpen)}>X</span>
                     <ul className="w-full flex flex-col gap-5 justify-start mt-20 px-5">
                         <Link className="text-xl" href="/products">📦 Продукти</Link>

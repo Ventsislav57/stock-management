@@ -152,7 +152,7 @@ export default function StockInPage() {
     }
 
     return (
-      <main className="h-screen w-scree text-white flex">
+      <main className="h-screen w-screen text-white flex flex-col md:flex-row">
         <SideNav />
         {loading && 
             <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/80">

@@ -118,7 +118,7 @@ export default function Products() {
                 <span className="products-loader"></span>
             </div>
         )}
-        <div className="w-full flex flex-col items-center justify-center h-full">
+        <div className="w-full flex flex-col items-center justify-center h-full mt-20 md:mt-0">
             {productDetails ? (
                 <div className="relative w-[80%] h-[90vh] overflow-auto bg-gray-900/90 border-2 border-white rounded-lg p-5 text-white">
                 <div
@@ -277,8 +277,8 @@ export default function Products() {
                 </div>
             ) : (
                 <div className="p-5 lg:p-20">
-                    <div className="flex justify-between items-center mb-4 gap-5">
-                        <div className="w-1/2 grid grid-cols-3 gap-5">
+                    <div className="flex flex-col xl:flex-row justify-between items-center mb-4 mt-48 md:mt-0 gap-5">
+                        <div className="w-full md:w-1/2 grid grid-cols-1 md:grid-cols-3 gap-5">
                             <button className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"  onClick={() => setSearchField('product-name')}>
                                 <span>Търсене на продукт</span>
                             </button>
