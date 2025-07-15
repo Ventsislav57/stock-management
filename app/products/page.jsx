@@ -25,14 +25,14 @@ export default function Products() {
     const qttyMax = Number(searchParams.qttyMax) || 100;
     const rangeWidth = qttyMax - qttyMin;
 
-      const initialMin = Number(searchParams.qttyMin) || 0;
-      const initialMax = Number(searchParams.qttyMax) || 100;
+    const initialMin = Number(searchParams.qttyMin) || 0;
+    const initialMax = Number(searchParams.qttyMax) || 100;
 
-      const [min, setMin] = useState(initialMin);
-      const [max, setMax] = useState(initialMax);
+    const [min, setMin] = useState(initialMin);
+    const [max, setMax] = useState(initialMax);
 
-      // Увери се, че min не е по-голям от max
-      useEffect(() => {
+    // Увери се, че min не е по-голям от max
+    useEffect(() => {
         if (min > max) setMin(max)
         if (max < min) setMax(min)
     }, [min, max])
