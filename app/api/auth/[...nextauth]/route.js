@@ -33,10 +33,10 @@ const handler = NextAuth({
     CredentialsProvider({
         name: "Credentials",
         credentials: {
-            username: {
-            label: "Потребителско име",
-            type: "text",
-            placeholder: "Потребителско име",
+                username: {
+                label: "Потребителско име",
+                type: "text",
+                placeholder: "Потребителско име",
             },
             password: { label: "Парола", type: "password", placeholder: "Парола" },
         },
