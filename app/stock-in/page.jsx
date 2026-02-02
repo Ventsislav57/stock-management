@@ -49,9 +49,11 @@ export default function StockInPage() {
     };
 
     function normalizeOperation(item) {
+        console.log(item);
+        
         return {
             operation_type:
-                item.OperTypeInvisible === "1"
+                item.OperTypeInvisible === "1" 
                     ? "delivery"
                     : item.OperTypeInvisible === "2"
                     ? "sale"
@@ -67,7 +69,8 @@ export default function StockInPage() {
             product_name: item.GoodName || "",
             measure: item.Measure1 || null,
     
-            distributor_id: item.PartnerID ? Number(item.PartnerID) : null,
+            partner_id: item.PartnerID ? Number(item.PartnerID) : null,
+            partner_name: item.Partner || null,
             location_id: item.LocationID ? Number(item.LocationID) : null,
             location_name: item.Object || null,
     

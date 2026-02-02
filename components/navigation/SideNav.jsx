@@ -14,6 +14,7 @@ import {
     ClipboardDocumentListIcon,
     DocumentMinusIcon,
     ChartBarIcon,
+    TruckIcon,
 } from "@heroicons/react/24/outline";
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
     { href: "/writeoff", label: "Изписвания", icon: DocumentMinusIcon },
     { href: "/orders", label: "Поръчки", icon: ClipboardDocumentListIcon },
     { href: "/logs", label: "Активности", icon: ChartBarIcon },
+    { href: "/distributors", label: "Дистрибутори", icon: TruckIcon }
 ];
 
 export default function SideNav() {
