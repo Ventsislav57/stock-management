@@ -1,70 +1,59 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { MongoClient } from "mongodb";
 import bcrypt from "bcrypt";
-
-const uri = process.env.CONNECTION_STRING;
-const client = new MongoClient(uri);
+import { prisma } from "@/lib/prisma";
 
 async function findUserByUsernameAndPassword(username, password) {
-    try {
-        await client.connect();
-        const db = client.db("test");
-        const user = await db.collection("admins").findOne({ username });
-        const allUsers = await db.collection("admins").find().toArray();
-        
-        if (!user) return null;
+    const user = await prisma.users.findUnique({
+        where: { username },
+    });
 
-        const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) return null;
+    if (!user) return null;
 
-        return {
-            id: user._id.toString(),
-            name: user.name || username,
-            email: user.email || null,
-        };
-    } finally {
-        await client.close();
-    }
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) return null;
+    
+    return {
+        id: user.id,
+        name: user.full_name,
+        email: null,
+    };
 }
 
 const handler = NextAuth({
-  providers: [
-    CredentialsProvider({
-        name: "Credentials",
-        credentials: {
-                username: {
-                label: "Потребителско име",
-                type: "text",
-                placeholder: "Потребителско име",
+    providers: [
+        CredentialsProvider({
+            name: "Credentials",
+            credentials: {
+                username: { label: "Потребителско име", type: "text" },
+                password: { label: "Парола", type: "password" },
             },
-            password: { label: "Парола", type: "password", placeholder: "Парола" },
-        },
-        async authorize(credentials) {
-            const user = await findUserByUsernameAndPassword(credentials.username, credentials.password);
-            if (user) return user;
-            return null;
-        }
+            async authorize(credentials) {
+                const user = await findUserByUsernameAndPassword(
+                    credentials.username,
+                    credentials.password
+                );
+            
+                if (user) return user;
+                return null;
+            }
+            
+        }),
+    ],
 
-    }),
-  ],
-  session: {
-        strategy: "jwt",
-  },
-  callbacks: {
-    async jwt({ token, user }) {
-        if (user) {
-            token.id = user.id;
-        }
-        return token;
+    session: { strategy: "jwt" },
+
+    callbacks: {
+        async jwt({ token, user }) {
+            if (user) token.id = user.id;
+            return token;
         },
         async session({ session, token }) {
-        if (token) {
-            session.user.id = token.id;
-        }
-        return session;
+            if (token) session.user.id = token.id;
+            return session;
         },
     },
+
     pages: {
         signIn: "/login",
     },

@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model users {
+  id            Int      @id @default(autoincrement())
+  full_name     String
+  username      String   @unique
+  password_hash String
+  role          String
+  location      String?
+  last_login    DateTime?
+  last_change   DateTime?
+  created_by    Int?
+  updated_by    Int?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+}
+
+model operations {
+  id             Int      @id @default(autoincrement())
+  operation_type String
+  code           Int?
+  acct           Int?
+  date           DateTime
+  product_id     Int
+  product_name   String
+  measure        String?
+  distributor_id Int?
+  distributor    distributors? @relation(fields: [distributor_id], references: [id])
+  location_id    Int?
+  location_name  String?
+  user_id        Int?
+  user_name      String?
+  quantity       Float
+  price          Float?
+  vat            Float?
+  total          Float?
+  note           String?
+  raw_xml        String?
+  created_at     DateTime @default(now())
+}
+
+
+model orders {
+  id          Int      @id @default(autoincrement())
+  created_by  Int
+  assigned_to Int?
+  location_id Int?
+  status      String   @default("draft")
+  note        String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  items order_items[]
+}
+
+model order_items {
+  id             Int      @id @default(autoincrement())
+  order_id       Int
+  product_id     Int
+  product_name   String
+  quantity       Float
+  measure        String?
+  price_estimated Float?
+  created_at     DateTime @default(now())
+
+  order orders @relation(fields: [order_id], references: [id], onDelete: Cascade)
+}
+
+model logs {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  action      String
+  entity_type String
+  entity_id   Int?
+  details     Json?
+  created_at  DateTime @default(now())
+}
+
+model distributors {
+  id             Int      @id @default(autoincrement())
+  name           String
+  vat_number     String?
+  bulstat        String?
+  contact_person String?
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  country        String?  @default("Bulgaria")
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  operations     operations[]
+}

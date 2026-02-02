@@ -1,81 +1,136 @@
-import dbConnect from "@/lib/mongodb";
-import Report from "@/models/Report";
+import { prisma } from "@/lib/prisma";
 
-function cleanValue(value) {
-  if (typeof value === "object" && value !== null) {
-    if ("$" in value) return "";
-    return "";
-  }
-  return value || "";
+function clean(value) {
+    if (typeof value === "object" && value !== null) return "";
+    return value ?? "";
 }
 
-function normalizeItem(item) {
+function normalize(item) {
     return {
-        CodeSort: cleanValue(item.CodeSort),
-        Acct: cleanValue(item.Acct),
-        Date: item.Date ? new Date(item.Date) : new Date(),
-        OperTypeInvisible: cleanValue(item.OperTypeInvisible),
-        Code: cleanValue(item.Code),
-        ItemID: cleanValue(item.ItemID),
-        GoodName: cleanValue(item.GoodName),
-        ItemGroupCode: cleanValue(item.ItemGroupCode),
-        GroupName: cleanValue(item.GroupName),
-        PartnerID: cleanValue(item.PartnerID),
-        Partner: cleanValue(item.Partner),
-        PartnerGroupCode: cleanValue(item.PartnerGroupCode),
-        PartnerGroupName: cleanValue(item.PartnerGroupName),
-        LocationID: cleanValue(item.LocationID),
-        Object: cleanValue(item.Object),
-        OperatorID: cleanValue(item.OperatorID),
-        UserName: cleanValue(item.UserName),
-        Qtty: parseFloat(item.Qtty) || 0,
-        Measure1: cleanValue(item.Measure1),
-        PriceIN: parseFloat(item.PriceIN) || 0,
-        VATIn1: parseFloat(item.VATIn1) || 0,
-        deliverysum: parseFloat(item.deliverysum) || 0,
-        VATIn: parseFloat(item.VATIn) || 0,
-        BG: cleanValue(item.BG),
-        IsTotal: parseInt(item.IsTotal, 10) || 0,
+        operation_type: clean(item.OperTypeInvisible) || "unknown",
+        code: item.Code ? Number(item.Code) : null,
+        acct: item.Acct ? Number(item.Acct) : null,
+        date: item.Date ? new Date(item.Date) : new Date(),
+
+        product_id: item.ItemID ? Number(item.ItemID) : 0,
+        product_name: clean(item.GoodName),
+        measure: clean(item.Measure1),
+
+        distributor_id: item.PartnerID ? Number(item.PartnerID) : null,
+        location_id: item.LocationID ? Number(item.LocationID) : null,
+        location_name: clean(item.Object),
+
+        user_id: item.OperatorID ? Number(item.OperatorID) : null,
+        user_name: clean(item.UserName),
+
+        quantity: parseFloat(item.Qtty) || 0,
+        price: parseFloat(item.PriceIN) || 0,
+        vat: parseFloat(item.VATIn) || 0,
+        total: parseFloat(item.deliverysum) || 0,
+
+        note: clean(item.BG),
+        raw_xml: JSON.stringify(item),
     };
 }
 
 export async function POST(req) {
     try {
-        await dbConnect();
-
         const body = await req.json();
 
         if (!Array.isArray(body.reports)) {
-            return new Response(JSON.stringify({ status: "error", message: "reports трябва да е масив" }), { status: 400 });
+            return new Response(
+                JSON.stringify({ status: "error", message: "reports трябва да е масив" }),
+                { status: 400 }
+            );
         }
+
+        const userId = body.user_id || null; // ID на потребителя, който качва файла
 
         const results = [];
 
-        for (const rawItem of body.reports) {
-            const item = normalizeItem(rawItem);
+        for (const raw of body.reports) {
+            const item = normalize(raw);
 
-            // Проверка дали запис с този ItemID съществува
-            const existing = await Report.findOne({ ItemID: item.ItemID });
+            const existing = await prisma.operations.findFirst({
+                where: {
+                    code: item.code,
+                    product_id: item.product_id,
+                    date: item.date,
+                },
+            });
 
             if (existing) {
-                // Ако има, актуализирай количеството (сумирай)
-                existing.Qtty = parseFloat(existing.Qtty || 0) + parseFloat(item.Qtty || 0);
+                const updated = await prisma.operations.update({
+                    where: { id: existing.id },
+                    data: {
+                        quantity: existing.quantity + item.quantity,
+                        price: item.price,
+                        vat: item.vat,
+                        total: item.total,
+                        note: item.note,
+                        raw_xml: item.raw_xml,
+                        updated_at: new Date(),
+                    },
+                });
 
-                // Ако искаш, можеш да актуализираш и други полета по избор
-                existing.PriceIN = Number(item.PriceIN); // примерно актуализирай цена
-                existing.Date = item.Date; // актуализирай дата и т.н.
+                // ЛОГ ЗА UPDATE
+                await prisma.logs.create({
+                    data: {
+                        user_id: userId,
+                        action: "update_operation",
+                        entity_type: "operation",
+                        entity_id: updated.id,
+                        details: {
+                            old_quantity: existing.quantity,
+                            new_quantity: updated.quantity,
+                            product_id: updated.product_id,
+                            code: updated.code,
+                        },
+                    },
+                });
 
-                await existing.save();
-                results.push({ ItemID: item.ItemID, status: "updated" });
+                results.push({ code: item.code, product_id: item.product_id, status: "updated" });
             } else {
-                // Ако няма, създай нов запис
-                const created = await Report.create({ ...item, Qtty: Number(item.Qtty) });
-                results.push({ ItemID: item.ItemID, status: "created", id: created._id });
+                const created = await prisma.operations.create({
+                    data: item,
+                });
+
+                // ЛОГ ЗА CREATE
+                await prisma.logs.create({
+                    data: {
+                        user_id: userId,
+                        action: "create_operation",
+                        entity_type: "operation",
+                        entity_id: created.id,
+                        details: {
+                            product_id: created.product_id,
+                            code: created.code,
+                            quantity: created.quantity,
+                        },
+                    },
+                });
+
+                results.push({ code: item.code, product_id: item.product_id, status: "created" });
             }
         }
 
-        return new Response(JSON.stringify({ message: "Успешно обработени записи", status: "success", results }),{ status: 200 })
+        return new Response(
+            JSON.stringify({
+                status: "success",
+                message: "Операциите са обработени успешно",
+                results,
+            }),
+            { status: 200 }
+        );
     } catch (error) {
-        return new Response(JSON.stringify({ error: "Грешка при качване", status: "error", details: error.message }),{ status: 500 });
+        console.error(error);
+        return new Response(
+            JSON.stringify({
+                status: "error",
+                message: "Грешка при обработка",
+                details: error.message,
+            }),
+            { status: 500 }
+        );
     }
 }

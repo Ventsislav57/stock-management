@@ -1,120 +1,80 @@
-
-import { useState, useEffect, useRef } from "react";
 import SideNav from "../navigation/SideNav";
 
-const HomePage = () => {
-    const [ bgnValue, setBgnValue ] = useState("");
-    const [ listening, setListening ] = useState(false);
-    const [ isChrome, setIsChrome ] = useState(false);
-    const recognitionRef = useRef(null);
-    const exchangeRate = 1.95583;
-
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-
-        const userAgent = navigator.userAgent.toLowerCase();
-        const isChrome = /chrome/.test(userAgent) && !/edge|edg|opr|opera|brave/.test(userAgent);
-        const isBrave = (navigator.brave && typeof navigator.brave.isBrave === "function" && navigator.brave.isBrave()) || userAgent.includes("brave");
-        setIsChrome(isChrome && !isBrave);
-
-        if (!isChrome) return;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return;
-
-        const recognition = new SpeechRecognition();
-        
-        recognition.lang = "bg-BG";
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            const numberFromVoice = transcript.replace(/[^0-9.]/g, "").trim();
-            if (numberFromVoice) setBgnValue(numberFromVoice);
-            setListening(false);
-        };
-
-        recognition.onerror = (event) => {
-            setListening(false);
-        };
-
-        recognition.onend = () => {
-            setListening(false);
-        };
-
-        recognitionRef.current = recognition;
-    }, []);
-
-
-
-    const startListening = () => {
-        if (recognitionRef.current) {
-            setListening(true);
-            recognitionRef.current.start();
-        }
-    };
-
-    const calculateEuro = () => {
-        const num = parseFloat(bgnValue);
-        if (isNaN(num)) return "0.00";
-        return (num / exchangeRate).toFixed(2);
-    };
-
+export default function HomePage() {
     return (
-        <section className="h-screen w-screen flex flex-col lg:flex-row">
+        <section className="h-screen w-screen flex flex-col lg:flex-row bg-gray-900 text-white">
             <SideNav />
 
-            <div className="flex-1 p-6 lg:p-10 text-white overflow-y-auto">
-                <h1 className="text-center text-2xl md:text-4xl font-bold border-b border-white pb-4">
-                    Калкулатор BGN → EUR
-                </h1>
+            <div className="flex-1 p-6 lg:p-10 overflow-y-auto space-y-10">
 
-                <div className="max-w-md mx-auto mt-10 border border-white/20 bg-white/10 p-8 rounded-2xl shadow-xl backdrop-blur-md">
-                    <div className="flex flex-col gap-6">
-                        <label className="text-lg font-medium text-center">
-                            Въведи сума в лева (BGN):
-                        </label>
+                {/* HEADER */}
+                <header className="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-bold">Админ Панел</h1>
+                        <p className="text-gray-400 mt-1">
+                            Управлявай доставки, продажби, изписвания и поръчки от едно място.
+                        </p>
+                    </div>
 
-                        <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            placeholder="Въведи лева"
-                            value={bgnValue}
-                            onChange={(e) => setBgnValue(e.target.value)}
-                            className="w-full px-6 py-3 rounded-full bg-white text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                        />
-                         {isChrome && 
-                            <button
-                                onClick={startListening}
-                                disabled={listening}
-                                className={`mt-2 w-full py-3 rounded-full text-lg font-medium cursor-pointer ${
-                                    listening
-                                    ? "bg-gray-400 cursor-not-allowed"
-                                    : "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+                    <div className="mt-4 md:mt-0 flex gap-3">
+                        <button className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold cursor-pointer">
+                            + Нова Поръчка
+                        </button>
+                    </div>
+                </header>
+
+                {/* KPI CARDS */}
+                <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    {[
+                        { title: "Доставки", value: "124", trend: "+12%" },
+                        { title: "Продажби", value: "312", trend: "+8%" },
+                        { title: "Изписвания", value: "58", trend: "-3%" },
+                        { title: "Активни поръчки", value: "17", trend: "+2%" },
+                    ].map((item, i) => (
+                        <div
+                            key={i}
+                            className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hover:border-indigo-500 transition"
+                        >
+                            <h3 className="text-lg font-semibold">{item.title}</h3>
+                            <p className="text-4xl font-bold mt-2">{item.value}</p>
+                            <p
+                                className={`text-sm mt-1 ${
+                                    item.trend.startsWith("+")
+                                        ? "text-green-400"
+                                        : "text-red-400"
                                 }`}
                             >
-                                {listening ? "Слуша..." : "🎤 Говори"}
-                            </button>
-                        }
-
-                        <div className="text-center mt-4">
-                            <p className="text-white text-xl font-medium">
-                                1 EUR = <span className="font-bold">{exchangeRate}</span> BGN
+                                {item.trend} този месец
                             </p>
                         </div>
+                    ))}
+                </section>
 
-                        <div className="text-center mt-8">
-                            <p className="text-lg">Резултат в евро:</p>
-                            <p className="text-4xl font-bold text-yellow-400 mt-2">
-                                € {calculateEuro()}
-                            </p>
+                {/* GRID: GRAPH + ACTIVITY + QUICK ACTIONS */}
+
+                    <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                        <h2 className="text-xl font-bold mb-4">Последни активности</h2>
+
+                        <div className="space-y-4">
+                            {[
+                                { text: "Нова доставка – Обект Стара Загора", time: "преди 12 мин" },
+                                { text: "Продажба – Артикул #4421", time: "преди 30 мин" },
+                                { text: "Изписване – Обект Казанлък", time: "преди 1 час" },
+                                { text: "Поръчка #112 одобрена", time: "преди 2 часа" },
+                            ].map((log, i) => (
+                                <div
+                                    key={i}
+                                    className="flex items-center justify-between p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition"
+                                >
+                                    <span>{log.text}</span>
+                                    <span className="text-sm text-gray-300">{log.time}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                </div>
+
+
             </div>
         </section>
     );
-};
-
-export default HomePage;
+}
