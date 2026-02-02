@@ -9,6 +9,8 @@ export async function GET() {
 }
 
 export async function POST(req) {
+    console.log(Object.keys(prisma));
+
     const data = await req.json();
     console.log(data);
     

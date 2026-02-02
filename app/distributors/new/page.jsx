@@ -2,19 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
+
 import SideNav from "@/components/navigation/SideNav";
+
 
 export default function NewDistributorPage() {
     const router = useRouter();
     const [form, setForm] = useState({
-        name: "",
+        name: "ДЕКА-ТРЕЙД ООД",
         vat_number: "",
-        bulstat: "",
-        contact_person: "",
-        phone: "",
-        email: "",
-        address: "",
-        city: "",
+        bulstat: "126047182",
+        contact_person: "ivan",
+        phone: "0899090900",
+        email: "ivan@abv.bg",
+        address: "р-н Северен, бул. ВАСИЛ АПРИЛОВ, 170",
+        city: "Пловдив",
         country: "Bulgaria",
     });
 
@@ -23,12 +26,42 @@ export default function NewDistributorPage() {
     }
 
     async function submit() {
-        await fetch("/api/distributors", {
-            method: "POST",
-            body: JSON.stringify(form),
-        });
+        try {
+            const { status } = await fetch("/api/distributors", {
+                method: "POST",
+                body: JSON.stringify(form),
+            });
+            
+            if (status === 'success') {
+                await Swal.fire({
+                    icon: "success",
+                    title: "Успешно създаване!",
+                    text: `<b>${form.name}</b> е успешно добавен.`,
+                    timer: 2000,
+                    showConfirmButton: false,
+                    timerProgressBar: true,
+                });
+                router.push("/distributors");
+                return;
+            } else {
+                await Swal.fire({
+                    icon: "error",
+                    title: "Неуспешно създаване",
+                    text: "Моля, проверете дали въведените данни са коректни. Ако всичко изглежда наред, но грешката продължава да се появява, свържете се с администратора на магазина.",
+                    confirmButtonText: "Затвори",
+                });
+                
+            }
 
-        router.push("/distributors");
+        } catch (error) {
+            // TODO Implemnt logger for errors!!
+            await Swal.fire({
+                icon: "error",
+                title: "Неуспешно създаване",
+                text: "Моля, проверете дали въведените данни са коректни. Ако всичко изглежда наред, но грешката продължава да се появява, свържете се с администратора на магазина.",
+                confirmButtonText: "Затвори",
+            });
+        }
     }
 
     return (
