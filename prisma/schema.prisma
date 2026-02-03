@@ -85,6 +85,7 @@ model logs {
 
 model distributors {
   id             Int      @id @default(autoincrement())
+  external_partner_id Int?     @unique
   name           String
   vat_number     String?
   bulstat        String?
