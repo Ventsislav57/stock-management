@@ -38,17 +38,68 @@ async function getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerNam
 
     const dist = await prisma.distributors.upsert({
         where: { external_partner_id: externalPartnerId },
-        update: { name },
+        update: { name, updated_at: new Date() },
         create: {
             external_partner_id: externalPartnerId,
             name,
             is_active: true,
-            // country: "Bulgaria" // ако нямаш default в DB
+            created_at: new Date(),
+            updated_at: new Date(),
         },
         select: { id: true },
     });
 
     return dist.id;
+}
+
+/**
+ * NEW: Upsert product row (current stock) for DELIVERY uploads.
+ * - if exists: stock += quantity, update last price/partner/date/name
+ * - if not: create with initial stock = quantity
+ */
+async function upsertProductOnDelivery({
+                                           product_id,
+                                           product_name,
+                                           distributor_id,
+                                           quantity,
+                                           price,
+                                           date,
+                                       }) {
+    // product_id is required; quantity may be 0, but delivery with 0 makes no sense; still allowed.
+    if (!product_id) return;
+
+    // If your DB column names differ, align them here.
+    await prisma.products.upsert({
+        where: { product_id },
+        update: {
+            product_name: product_name || undefined,
+            distributor_id: distributor_id ?? undefined,
+
+            // increment current stock by delivered qty
+            stock: { increment: quantity },
+
+            // last delivery price (if provided)
+            delivery_price: price ?? undefined,
+
+            // last restock date
+            last_restocked_at: date ?? undefined,
+
+            updated_at: new Date(),
+        },
+        create: {
+            product_id,
+            product_name: product_name || "",
+            distributor_id: distributor_id ?? null,
+
+            stock: quantity,
+
+            delivery_price: price ?? null,
+            last_restocked_at: date ?? null,
+
+            created_at: new Date(),
+            updated_at: new Date(),
+        },
+    });
 }
 
 /**
@@ -66,7 +117,7 @@ function coerceClientReport(r) {
     const product_name = cleanStr(r.product_name, "");
     const measure = r.measure === null ? null : cleanStr(r.measure, null);
 
-    // client sends partner_id; DB uses distributor_id
+    // client sends partner_id; DB uses distributor_id (but we still convert via getOrCreateDistributorIdByExternalPartnerId)
     const distributor_id = toNumber(r.partner_id, null);
     const location_id = toNumber(r.location_id, null);
     const location_name = cleanStr(r.location_name, "");
@@ -127,9 +178,6 @@ export async function POST(req) {
             );
         }
 
-        // Debug: виж ключове при нужда
-        // console.log("UPLOAD first report keys:", Object.keys(body.reports?.[0] || {}));
-
         const results = [];
 
         for (let i = 0; i < body.reports.length; i++) {
@@ -149,8 +197,12 @@ export async function POST(req) {
 
             const item = coerced.data;
 
-            // IMPORTANT: date equality is fragile; leaving as-is for now, because you already use it.
-            // If you see duplicates, we’ll change matching to day-range or to code+product_id only.
+            // Resolve/Upsert distributor by external_partner_id (partner_id from XML)
+            const partnerId = raw.partner_id ?? null;
+            const partnerName = raw.partner_name ?? raw.partner ?? null;
+            item.distributor_id = await getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerName);
+
+            // Match existing operation (same logic you already used)
             const existing = await prisma.operations.findFirst({
                 where: {
                     code: item.code,
@@ -159,11 +211,12 @@ export async function POST(req) {
                 },
             });
 
-            if (existing) {
-                const partnerId = raw.partner_id ?? null;
-                const partnerName = raw.partner_name ?? raw.partner ?? null;
+            // Quantity delta for stock update:
+            // - on create: delta = item.quantity
+            // - on update: you ADD item.quantity to existing.quantity, so delta is also item.quantity
+            const stockDelta = item.quantity;
 
-                item.distributor_id = await getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerName);
+            if (existing) {
                 const updated = await prisma.operations.update({
                     where: { id: existing.id },
                     data: {
@@ -177,9 +230,18 @@ export async function POST(req) {
                     },
                 });
 
-                // LOG UPDATE: use report.user_id (operator) because client does not send body.user_id
-                const logUserId = item.user_id ?? null;
+                // update products table (current stock) for DELIVERY
+                await upsertProductOnDelivery({
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    distributor_id: item.distributor_id,
+                    quantity: stockDelta,
+                    price: item.price,
+                    date: item.date,
+                });
 
+                // LOG UPDATE
+                const logUserId = item.user_id ?? null;
                 if (logUserId) {
                     await prisma.logs.create({
                         data: {
@@ -193,6 +255,7 @@ export async function POST(req) {
                                 product_id: updated.product_id,
                                 code: updated.code,
                             },
+                            created_at: new Date(),
                         },
                     });
                 } else {
@@ -201,17 +264,22 @@ export async function POST(req) {
 
                 results.push({ index: i, code: item.code, product_id: item.product_id, status: "updated" });
             } else {
-                const partnerId = raw.partner_id ?? null;
-                const partnerName = raw.partner_name ?? raw.partner ?? null;
-
-                item.distributor_id = await getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerName);
                 const created = await prisma.operations.create({
                     data: item,
                 });
 
-                // LOG CREATE: use report.user_id
-                const logUserId = item.user_id ?? null;
+                // NEW: update products table (current stock) for DELIVERY
+                await upsertProductOnDelivery({
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    distributor_id: item.distributor_id,
+                    quantity: stockDelta,
+                    price: item.price,
+                    date: item.date,
+                });
 
+                // LOG CREATE
+                const logUserId = item.user_id ?? null;
                 if (logUserId) {
                     await prisma.logs.create({
                         data: {
@@ -224,6 +292,7 @@ export async function POST(req) {
                                 code: created.code,
                                 quantity: created.quantity,
                             },
+                            created_at: new Date(),
                         },
                     });
                 } else {

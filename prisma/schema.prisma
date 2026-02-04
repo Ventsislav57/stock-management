@@ -100,4 +100,31 @@ model distributors {
   updated_at     DateTime @default(now())
 
   operations     operations[]
+  
+  products       products[]
+}
+
+model products {
+  id              Int       @id @default(autoincrement())
+
+  product_id      Int       @unique        
+  product_name    String                     
+  item_id         String?                    
+
+  stock           Float     @default(0)      
+  delivery_price  Float?                     
+
+  distributor_id  Int?
+  distributor     distributors? @relation(fields: [distributor_id], references: [id], onDelete: SetNull)
+
+  last_restocked_at DateTime?
+
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now())
+
+  @@index([product_name])
+  @@index([item_id])
+  @@index([distributor_id])
+  @@index([stock])
+  @@index([last_restocked_at])
 }

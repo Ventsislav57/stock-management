@@ -1,135 +1,292 @@
-import dbConnect from "@/lib/mongodb";
-import Report from "@/models/Report";
+import { prisma } from "@/lib/prisma";
+
+function cleanStr(v) {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "object") return "";
+    return String(v).trim();
+}
+
+function toInt(v, fallback) {
+    const s = cleanStr(v);
+    if (!s) return fallback;
+    const n = Number.parseInt(s, 10);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function toFloat(v, fallback = null) {
+    const s = cleanStr(v);
+    if (!s || s === "undefined") return fallback;
+    const n = Number.parseFloat(s.replace(",", "."));
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function parseDayRangeUTC(v) {
+    const s = cleanStr(v);
+    if (!s) return null;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+
+    // като в стария код: UTC day range
+    const start = new Date(d);
+    start.setUTCHours(0, 0, 0, 0);
+
+    const end = new Date(d);
+    end.setUTCHours(23, 59, 59, 999);
+
+    return { start, end };
+}
+
+function getColor(percent) {
+    if (percent === null) return "green";
+    if (percent < 15) return "red";
+    if (percent <= 50) return "yellow";
+    return "green";
+}
+
+function colorRank(color) {
+    if (color === "red") return 0;
+    if (color === "yellow") return 1;
+    return 2;
+}
 
 export async function GET(request) {
     try {
-        await dbConnect();
-
         const url = new URL(request.url);
         const params = url.searchParams;
 
-        const limit = parseInt(params.get("limit")) || 10;
-        const skip = parseInt(params.get("skip")) || 0;
+        const limit = toInt(params.get("limit"), 10);
+        const skip = toInt(params.get("skip"), 0);
 
-        const filter = {};
+        // ------- OLD FILTERS (same param names) -------
+        const goodName = cleanStr(params.get("goodName"));
+        const partner = cleanStr(params.get("partner"));
 
-        // Филтри по име
-        const goodName = params.get("goodName");
-        if (goodName) {
-            filter.GoodName = { $regex: goodName, $options: "i" };
-        }
+        const itemId = cleanStr(params.get("itemId"));
+        const ItemID = cleanStr(params.get("ItemID")); // legacy alias
+        const itemIdValue = itemId || ItemID;
 
-        // Филтри по партньор
-        const partner = params.get("partner");
-        if (partner) {
-            filter.Partner = { $regex: partner, $options: "i" };
-        }
-
-        // itemId (точно съвпадение)
-        const itemId = params.get("itemId");
-        if (itemId) {
-            filter.itemId = itemId;
-        }
-
-        // ItemID (може би с главна буква, зависи от базата)
-        const ItemID = params.get("ItemID");
-        if (ItemID) {
-            filter.ItemID = ItemID;
-        }
-
-        // Date (или интервал)
         const date = params.get("Date");
         const dateFrom = params.get("dateFrom");
         const dateTo = params.get("dateTo");
+
+        const priceIn = toFloat(params.get("priceIn"), null);
+        const priceMin = toFloat(params.get("priceMin"), null);
+        const priceMax = toFloat(params.get("priceMax"), null);
+
+        const qttyMin = toFloat(params.get("qttyMin"), null);
+        const qttyMax = toFloat(params.get("qttyMax"), null);
+
+        // deliverysum filters (legacy) -> ще филтрираме по last_delivery_qty
+        const deliveryMin = toFloat(params.get("deliveryMin"), null);
+        const deliveryMax = toFloat(params.get("deliveryMax"), null);
+
+        // ------- Prisma where for Product -------
+        const where = {};
+
+        if (goodName) {
+            where.product_name = { contains: goodName, mode: "insensitive" };
+        }
+
+        if (partner) {
+            // Partner е по име (regex i в Mongo)
+            where.distributor = { name: { contains: partner, mode: "insensitive" } };
+        }
+
+        if (itemIdValue) {
+            // в Mongo беше точно съвпадение
+            where.item_id = itemIdValue;
+        }
+
+        // Date / dateFrom / dateTo — ще ги вържем към last_restocked_at (логично за products)
         if (date) {
-            const start = new Date(date);
-            start.setUTCHours(0, 0, 0, 0);
-            const end = new Date(date);
-            end.setUTCHours(23, 59, 59, 999);
-
-            filter.Date = { $gte: start, $lte: end };
+            const r = parseDayRangeUTC(date);
+            if (r) where.last_restocked_at = { gte: r.start, lte: r.end };
         } else if (dateFrom || dateTo) {
-            filter.Date = {};
-            if (dateFrom) filter.Date.$gte = new Date(dateFrom);
-            if (dateTo) filter.Date.$lte = new Date(dateTo);
+            where.last_restocked_at = {};
+            if (dateFrom) where.last_restocked_at.gte = new Date(dateFrom);
+            if (dateTo) where.last_restocked_at.lte = new Date(dateTo);
         }
 
-        // Цена IN
-        const priceIn = parseFloat(params.get("priceIn"));
-        const priceMin = parseFloat(params.get("priceMin"));
-        const priceMax = parseFloat(params.get("priceMax"));
-        if (!isNaN(priceIn)) {
-            filter.PriceIN = priceIn;
-        } else if (!isNaN(priceMin) || !isNaN(priceMax)) {
-            filter.PriceIN = {};
-            if (!isNaN(priceMin)) filter.PriceIN.$gte = priceMin;
-            if (!isNaN(priceMax)) filter.PriceIN.$lte = priceMax;
+        // PriceIN
+        if (priceIn !== null) {
+            // Mongo: exact match
+            where.delivery_price = priceIn;
+        } else if (priceMin !== null || priceMax !== null) {
+            where.delivery_price = {};
+            if (priceMin !== null) where.delivery_price.gte = priceMin;
+            if (priceMax !== null) where.delivery_price.lte = priceMax;
         }
 
-        // Количество (Qtty)
-        const qttyMin = parseFloat(params.get("qttyMin"));
-        const qttyMax = parseFloat(params.get("qttyMax"));
-        if (!isNaN(qttyMin) || !isNaN(qttyMax)) {
-            filter.Qtty = {};
-            if (!isNaN(qttyMin)) filter.Qtty.$gte = qttyMin;
-            if (!isNaN(qttyMax)) filter.Qtty.$lte = qttyMax;
+        // Qtty -> stock
+        if (qttyMin !== null || qttyMax !== null) {
+            where.stock = {};
+            if (qttyMin !== null) where.stock.gte = qttyMin;
+            if (qttyMax !== null) where.stock.lte = qttyMax;
         }
 
-        // Доставка
-        const deliveryMin = parseFloat(params.get("deliveryMin"));
-        const deliveryMax = parseFloat(params.get("deliveryMax"));
-        if (!isNaN(deliveryMin) || !isNaN(deliveryMax)) {
-            filter.deliverysum = {};
-            if (!isNaN(deliveryMin)) filter.deliverysum.$gte = deliveryMin;
-            if (!isNaN(deliveryMax)) filter.deliverysum.$lte = deliveryMax;
+        // 1) взимаме ВСИЧКИ matching продукти (за да сортираме глобално red/yellow/other)
+        // ако по-нататък стане много голямо — ще го оптимизираме със SQL DISTINCT ON + CASE + LIMIT/OFFSET
+        const matched = await prisma.products.findMany({
+            where,
+            orderBy: { updated_at: "desc" },
+            include: {
+                distributor: { select: { id: true, name: true, external_partner_id: true } },
+            },
+        });
+
+        const total = matched.length;
+
+        // 2) last delivery за всеки product_id
+        const productIds = matched.map((p) => p.product_id);
+
+        const lastOps = productIds.length
+            ? await prisma.operations.findMany({
+                where: { product_id: { in: productIds } },
+                orderBy: [{ product_id: "asc" }, { date: "desc" }],
+                select: { product_id: true, quantity: true, date: true },
+            })
+            : [];
+
+        const lastByProductId = new Map();
+        for (const op of lastOps) {
+            if (!lastByProductId.has(op.product_id)) lastByProductId.set(op.product_id, op);
         }
 
-        // Агрегации за минимуми и максимуми
-        const priceStats = await Report.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    minPrice: { $min: "$PriceIN" },
-                    maxPrice: { $max: "$PriceIN" },
-                    minQtty: { $min: "$Qtty" },
-                    maxQtty: { $max: "$Qtty" },
-                    minDelivery: { $min: "$deliverysum" },
-                    maxDelivery: { $max: "$deliverysum" },
+        // Ако още няма продажби/изписвания в системата -> всички са 100%
+        const hasOutOps = await prisma.operations.findFirst({
+            where: {
+                operation_type: {
+                    in: ["sale", "sales", "stock_out", "out", "sell", "issue", "writeoff"],
                 },
             },
-        ]);
+            select: { id: true },
+        });
 
-        const stats = priceStats[0] || {
-            minPrice: 0,
-            maxPrice: 0,
-            minQtty: 0,
-            maxQtty: 0,
-            minDelivery: 0,
-            maxDelivery: 0,
+        const forceAllTo100 = !hasOutOps;
+        
+        // 3) enrich + legacy aliases (за да не пипаш page.jsx)
+        const enriched = matched.map((p) => {
+            const last = lastByProductId.get(p.product_id) || null;
+
+            const stock = Number(p.stock ?? 0);
+            const lastQty = last ? Number(last.quantity ?? 0) : 0;
+
+            let percent = last && lastQty > 0 ? Math.round((stock / lastQty) * 100) : null;
+            if (percent !== null) percent = Math.max(0, Math.min(100, percent));
+            const color = getColor(percent);
+
+            const partnerName = p.distributor?.name ?? null;
+
+            return {
+                // ---- original (new world) ----
+                ...p,
+                distributor_name: partnerName,
+                last_delivery_qty: last ? lastQty : null,
+                last_delivery_date: last ? last.date : null,
+                stock_percent: percent,
+                color,
+
+                // ---- legacy keys (old world) ----
+                GoodName: p.product_name,
+                Partner: partnerName,
+                PriceIN: p.delivery_price ?? null,
+                Qtty: p.stock ?? 0,
+                Date: p.last_restocked_at ?? null,
+                itemId: p.item_id ?? null,
+                ItemID: p.item_id ?? null,
+                deliverysum: last ? lastQty : null,
+            };
+        });
+
+        // 4) deliverysum filters (legacy) – прилагаме ги СЛЕД като имаме last_delivery_qty
+        let filtered = enriched;
+        if (deliveryMin !== null || deliveryMax !== null) {
+            filtered = filtered.filter((x) => {
+                const v = x.last_delivery_qty;
+                if (v === null || v === undefined) return false;
+                if (deliveryMin !== null && v < deliveryMin) return false;
+                if (deliveryMax !== null && v > deliveryMax) return false;
+                return true;
+            });
+        }
+
+        // total след delivery filters (за да е честно към UI)
+        const totalAfter = filtered.length;
+
+        // 5) Stats (като Mongo aggregate)
+        // min/max за PriceIN, Qtty, Delivery
+        let minPrice = Infinity,
+            maxPrice = -Infinity,
+            minQtty = Infinity,
+            maxQtty = -Infinity,
+            minDelivery = Infinity,
+            maxDelivery = -Infinity;
+
+        for (const x of filtered) {
+            const price = x.PriceIN;
+            if (typeof price === "number" && Number.isFinite(price)) {
+                if (price < minPrice) minPrice = price;
+                if (price > maxPrice) maxPrice = price;
+            }
+
+            const qtty = Number(x.Qtty ?? 0);
+            if (Number.isFinite(qtty)) {
+                if (qtty < minQtty) minQtty = qtty;
+                if (qtty > maxQtty) maxQtty = qtty;
+            }
+
+            const del = x.deliverysum;
+            if (typeof del === "number" && Number.isFinite(del)) {
+                if (del < minDelivery) minDelivery = del;
+                if (del > maxDelivery) maxDelivery = del;
+            }
+        }
+
+        const stats = {
+            minPrice: minPrice === Infinity ? 0 : minPrice,
+            maxPrice: maxPrice === -Infinity ? 0 : maxPrice,
+            minQtty: minQtty === Infinity ? 0 : minQtty,
+            maxQtty: maxQtty === -Infinity ? 0 : maxQtty,
+            minDelivery: minDelivery === Infinity ? 0 : minDelivery,
+            maxDelivery: maxDelivery === -Infinity ? 0 : maxDelivery,
         };
 
-        const total = await Report.countDocuments(filter);
+        // 6) Global sort: red -> yellow -> other, after that by % asc, then by name
+        filtered.sort((a, b) => {
+            const r = colorRank(a.color) - colorRank(b.color);
+            if (r !== 0) return r;
 
-        const results = await Report.find(filter)
-            .skip(skip)
-            .limit(limit)
-            .lean();
+            const ap = a.stock_percent ?? 999999;
+            const bp = b.stock_percent ?? 999999;
+            if (ap !== bp) return ap - bp;
 
-        return new Response(JSON.stringify({
-            message: "Успешно заредени записи",
-            status: "success",
-            results,
-            total,
-            limit,
-            skip,
-            stats,
-        }), { status: 200 });
+            return String(a.product_name || "").localeCompare(String(b.product_name || ""), "bg");
+        });
 
+        // 7) pagination (както беше: skip/limit)
+        const results = filtered.slice(skip, skip + limit);
+
+        return new Response(
+            JSON.stringify({
+                message: "Успешно заредени записи",
+                status: "success",
+                results,
+                total: totalAfter,
+                limit,
+                skip,
+                stats,
+            }),
+            { status: 200 }
+        );
     } catch (error) {
-        return new Response(JSON.stringify({
-            error: "Грешка при зареждане",
-            status: "error",
-            details: error.message,
-        }), { status: 500 });
+        console.error("GET /api/products error:", error);
+        return new Response(
+            JSON.stringify({
+                error: "Грешка при зареждане",
+                status: "error",
+                details: error?.message ?? String(error),
+            }),
+            { status: 500 }
+        );
     }
 }
