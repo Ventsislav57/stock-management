@@ -19,7 +19,6 @@ function toFloat(v, fallback = null) {
     const n = Number.parseFloat(s.replace(",", "."));
     return Number.isFinite(n) ? n : fallback;
 }
-
 function parseDayRangeUTC(v) {
     const s = cleanStr(v);
     if (!s) return null;
@@ -49,11 +48,35 @@ function colorRank(color) {
     return 2;
 }
 
+async function resolveDistributorId(prisma, distributorIdParam) {
+    if (distributorIdParam) {
+        const n = Number.parseInt(String(distributorIdParam), 10);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    const first = await prisma.distributors.findFirst({
+        select: { id: true },
+        orderBy: { name: "asc" },
+    });
+
+    return first?.id ?? null;
+}
+
 export async function GET(request) {
     try {
         const url = new URL(request.url);
         const params = url.searchParams;
 
+        const distributorIdParam = cleanStr(params.get("distributorId"));
+        const selectedDistributorId = await resolveDistributorId(prisma, distributorIdParam);
+        
+        if (distributorIdParam && selectedDistributorId === null) {
+            return new Response(
+                JSON.stringify({ status: "error", error: "Invalid distributorId" }),
+                { status: 400 }
+            );
+        }
+        
         const limit = toInt(params.get("limit"), 10);
         const skip = toInt(params.get("skip"), 0);
 
@@ -79,16 +102,19 @@ export async function GET(request) {
         // deliverysum filters (legacy) -> ще филтрираме по last_delivery_qty
         const deliveryMin = toFloat(params.get("deliveryMin"), null);
         const deliveryMax = toFloat(params.get("deliveryMax"), null);
-
+        
         // ------- Prisma where for Product -------
         const where = {};
+
+        if (selectedDistributorId !== null) {
+            where.distributor_id = selectedDistributorId;
+        }
 
         if (goodName) {
             where.product_name = { contains: goodName, mode: "insensitive" };
         }
 
         if (partner) {
-            // Partner е по име (regex i в Mongo)
             where.distributor = { name: { contains: partner, mode: "insensitive" } };
         }
 
@@ -151,18 +177,6 @@ export async function GET(request) {
         for (const op of lastOps) {
             if (!lastByProductId.has(op.product_id)) lastByProductId.set(op.product_id, op);
         }
-
-        // Ако още няма продажби/изписвания в системата -> всички са 100%
-        const hasOutOps = await prisma.operations.findFirst({
-            where: {
-                operation_type: {
-                    in: ["sale", "sales", "stock_out", "out", "sell", "issue", "writeoff"],
-                },
-            },
-            select: { id: true },
-        });
-
-        const forceAllTo100 = !hasOutOps;
         
         // 3) enrich + legacy aliases (за да не пипаш page.jsx)
         const enriched = matched.map((p) => {
@@ -275,6 +289,7 @@ export async function GET(request) {
                 limit,
                 skip,
                 stats,
+                selectedDistributorId,
             }),
             { status: 200 }
         );

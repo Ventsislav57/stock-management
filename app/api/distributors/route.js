@@ -1,23 +1,24 @@
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-    const distributors = await prisma.distributors.findMany({
-        orderBy: { name: "asc" }
-    });
+    try {
+        const items = await prisma.distributors.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+        });
 
-    return Response.json(distributors);
-}
+        const defaultDistributorId = items[0]?.id ?? null;
 
-export async function POST(req) {
-    console.log(Object.keys(prisma));
-
-    const data = await req.json();
-    console.log(data);
-    
-
-    const created = await prisma.distributors.create({
-        data
-    });
-
-    return Response.json(created);
+        return Response.json({
+            status: "success",
+            defaultDistributorId,
+            items,
+        });
+    } catch (e) {
+        console.error("GET /api/distributors error:", e);
+        return Response.json(
+            { status: "error", error: e?.message ?? String(e) },
+            { status: 500 }
+        );
+    }
 }

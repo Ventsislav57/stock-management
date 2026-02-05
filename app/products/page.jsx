@@ -1,6 +1,8 @@
-'use client';
+"use client";
 import SideNav from "@/components/navigation/SideNav";
 import { useEffect, useState, useRef } from "react";
+
+import DistributorSelect from "@/components/distributors/DistributorSelect";
 
 function rowBgByColor(color) {
     if (color === "red") return "bg-red-500/25 hover:bg-red-500/35";
@@ -17,12 +19,16 @@ export default function Products() {
     const [productDetails, setProductDetails] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    // ✅ NEW: distributor filter (from dropdown)
+    const [distributorId, setDistributorId] = useState("");
+
     const [searchParams, setSearchParams] = useState({
-        productNumber: "",     
+        productNumber: "",
         goodName: "",
+        itemId: "", // ✅ FIX: имаш input за itemId, но нямаше state
         priceIn: "",
         qttyMin: "",
-        qttyMax: "",           
+        qttyMax: "",
         Partner: "",
         date: "",
     });
@@ -35,12 +41,12 @@ export default function Products() {
         const t = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(t);
     }, []);
-    
+
     useEffect(() => {
         if (min > max) setMin(max);
         if (max < min) setMax(min);
     }, [min, max]);
-    
+
     useEffect(() => {
         setSearchParams((prev) => ({
             ...prev,
@@ -55,6 +61,7 @@ export default function Products() {
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const currentPage = Math.floor(skip / limit) + 1;
 
+    // ✅ Fetch data (includes distributorId)
     useEffect(() => {
         if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
@@ -62,26 +69,41 @@ export default function Products() {
             const fetchData = async () => {
                 setLoading(true);
                 try {
-                    const query = new URLSearchParams({
+                    const qs = new URLSearchParams({
                         limit: String(limit),
                         skip: String(skip),
 
-                        ItemID: searchParams.productNumber, 
+                        // legacy / current filters
+                        ItemID: searchParams.productNumber, // по твоя API
                         goodName: searchParams.goodName,
                         priceIn: searchParams.priceIn,
                         qttyMin: searchParams.qttyMin,
                         qttyMax: searchParams.qttyMax,
-                        Date: searchParams.date ? new Date(searchParams.date).toISOString().split("T")[0] : "",
+                        Date: searchParams.date
+                            ? new Date(searchParams.date).toISOString().split("T")[0]
+                            : "",
                         partner: searchParams.Partner,
-                    }).toString();
+                    });
 
-                    const res = await fetch(`/api/products?${query}`);
+                    // ✅ NEW: distributorId param
+                    if (distributorId) qs.set("distributorId", distributorId);
+
+                    // ✅ Ако искаш да ползваш itemId филтъра реално:
+                    // (в момента API-то ти гледа itemId/ItemID, но ти вече пращаш ItemID от productNumber)
+                    // Ако искаш отделно itemId поле, ще трябва да решиш кой от двата да отива в ItemID.
+                    // Засега НЕ го пращам, за да не се бият.
+                    // if (searchParams.itemId) qs.set("itemId", searchParams.itemId);
+
+                    const res = await fetch(`/api/products?${qs.toString()}`, { cache: "no-store" });
                     const data = await res.json();
 
                     if (!res.ok) throw new Error(data.error || "Грешка при заявката");
 
                     setReports(data.results || []);
                     setTotal(data.total || 0);
+
+                    // по желание: ако API върне selectedDistributorId, може да го синхронизираш
+                    // if (!distributorId && data.selectedDistributorId) setDistributorId(data.selectedDistributorId);
                 } catch (err) {
                     console.error("Грешка при търсене", err);
                 } finally {
@@ -93,7 +115,7 @@ export default function Products() {
         }, 500);
 
         return () => clearTimeout(debounceTimeout.current);
-    }, [searchParams, skip, limit]);
+    }, [searchParams, skip, limit, distributorId]); // ✅ добавих distributorId
 
     const handleNext = () => {
         if (skip + limit < total) setSkip(skip + limit);
@@ -118,6 +140,13 @@ export default function Products() {
         setSkip(0);
     };
 
+    // ✅ NEW: handle distributor change
+    const handleDistributorChange = (id) => {
+        setDistributorId(id);
+        setSkip(0);
+        setProductDetails(null);
+    };
+
     return (
         <main className="h-screen w-scree text-white flex flex-col lg:flex-row">
             <SideNav />
@@ -136,7 +165,13 @@ export default function Products() {
                             className="absolute left-5 top-6 cursor-pointer transition-all duration-300 hover:ml-[-5px]"
                             onClick={() => setProductDetails(null)}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                height="24px"
+                                viewBox="0 -960 960 960"
+                                width="24px"
+                                fill="#FFFFFF"
+                            >
                                 <path d="m313-440 224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" />
                             </svg>
                         </div>
@@ -168,7 +203,9 @@ export default function Products() {
 
                             <div className="flex flex-col">
                                 <b className="text-xl border-b-2 border-white pb-5 mb-5">Доставна цена:</b>
-                                {productDetails.delivery_price != null ? `${Number(productDetails.delivery_price).toFixed(2)} лв.` : "-"}
+                                {productDetails.delivery_price != null
+                                    ? `${Number(productDetails.delivery_price).toFixed(2)} лв.`
+                                    : "-"}
                             </div>
 
                             <div className="flex flex-col">
@@ -178,7 +215,9 @@ export default function Products() {
 
                             <div className="flex flex-col">
                                 <b className="text-xl border-b-2 border-white pb-5 mb-5">Дата на последно зареждане:</b>
-                                {productDetails.last_restocked_at ? new Date(productDetails.last_restocked_at).toLocaleString("bg-BG") : "-"}
+                                {productDetails.last_restocked_at
+                                    ? new Date(productDetails.last_restocked_at).toLocaleString("bg-BG")
+                                    : "-"}
                             </div>
 
                             <div className="flex flex-col">
@@ -193,7 +232,15 @@ export default function Products() {
 
                             <div className="flex flex-col md:col-span-3">
                                 <b className="text-xl border-b-2 border-white pb-5 mb-5">Статус:</b>
-                                <span className={productDetails.color === "red" ? "text-red-300" : productDetails.color === "yellow" ? "text-yellow-300" : "text-green-300"}>
+                                <span
+                                    className={
+                                        productDetails.color === "red"
+                                            ? "text-red-300"
+                                            : productDetails.color === "yellow"
+                                                ? "text-yellow-300"
+                                                : "text-green-300"
+                                    }
+                                >
                   {productDetails.color?.toUpperCase()}
                 </span>
                             </div>
@@ -203,13 +250,22 @@ export default function Products() {
                     <div className="p-5 lg:p-20 w-full">
                         <div className="flex flex-col xl:flex-row justify-between items-center mb-4 mt-48 md:mt-0 gap-5">
                             <div className="w-full md:w-1/2 grid grid-cols-1 md:grid-cols-3 gap-5">
-                                <button className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl" onClick={() => setSearchField("product-name")}>
+                                <button
+                                    className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"
+                                    onClick={() => setSearchField("product-name")}
+                                >
                                     <span>Търсене на продукт</span>
                                 </button>
-                                <button className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl" onClick={() => setSearchField("search-by")}>
+                                <button
+                                    className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"
+                                    onClick={() => setSearchField("search-by")}
+                                >
                                     <span>Търсене по ...</span>
                                 </button>
-                                <button className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl" onClick={() => setSearchField("search-by")}>
+                                <button
+                                    className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"
+                                    onClick={() => setSearchField("search-by")}
+                                >
                                     <span>Търсене по ...</span>
                                 </button>
                             </div>
@@ -234,6 +290,19 @@ export default function Products() {
 
                         <div className="relative h-[80vh] overflow-auto bg-gray-900/90 border-2 border-white rounded-t-lg">
                             <div className="sticky top-0 bg-gray-900 text-white p-4 border-b-2 cursor-default font-semibold">
+                                {/* ✅ NEW: Distributor dropdown */}
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                                    <DistributorSelect
+                                        value={distributorId}
+                                        onChange={handleDistributorChange}
+                                    />
+
+                                    {/* debug (можеш да го махнеш после) */}
+                                    <div className="text-xs text-white/60">
+                                        distributorId: <span className="text-white">{distributorId || "(default)"}</span>
+                                    </div>
+                                </div>
+
                                 {searchField === "product-name" && (
                                     <div className="col-span-12 flex justify-between gap-y-6 gap-x-4 border-b-2 border-white pb-4 mb-5">
                                         <div className="grid grid-cols-6 gap-5 w-full">
@@ -259,7 +328,7 @@ export default function Products() {
                                                 type="text"
                                                 name="itemId"
                                                 placeholder="Item ID"
-                                                value={searchParams.itemId || ""}
+                                                value={searchParams.itemId}
                                                 onChange={handleSearchChange}
                                                 className="border p-2 rounded bg-transparent text-white placeholder:text-white/60"
                                             />
@@ -348,9 +417,15 @@ export default function Products() {
                                 {reports.map((p, index) => (
                                     <div
                                         key={p.id ?? index}
-                                        className={`grid grid-cols-12 items-center text-white py-4 border-b-2 cursor-pointer ${rowBgByColor(p.color)}`}
+                                        className={`grid grid-cols-12 items-center text-white py-4 border-b-2 cursor-pointer ${rowBgByColor(
+                                            p.color
+                                        )}`}
                                         onClick={() => setProductDetails(p)}
-                                        title={p.stock_percent != null ? `Наличност: ${p.stock_percent}% (посл. доставка: ${p.last_delivery_qty ?? "-"})` : "Няма данни за последна доставка"}
+                                        title={
+                                            p.stock_percent != null
+                                                ? `Наличност: ${p.stock_percent}% (посл. доставка: ${p.last_delivery_qty ?? "-"})`
+                                                : "Няма данни за последна доставка"
+                                        }
                                     >
                                         <div className="col-span-2 border-r-2 border-white text-center">
                                             <span>{p.product_id}</span>
