@@ -67,43 +67,43 @@ export async function GET(request) {
         const url = new URL(request.url);
         const params = url.searchParams;
 
+        // Distributor filter
         const distributorIdParam = cleanStr(params.get("distributorId"));
         const selectedDistributorId = await resolveDistributorId(prisma, distributorIdParam);
-        
+
         if (distributorIdParam && selectedDistributorId === null) {
             return new Response(
                 JSON.stringify({ status: "error", error: "Invalid distributorId" }),
                 { status: 400 }
             );
         }
-        
-        const limit = toInt(params.get("limit"), 10);
+
+        const limit = toInt(params.get("limit"), 50);
         const skip = toInt(params.get("skip"), 0);
 
-        // ------- OLD FILTERS (same param names) -------
+        // Filters
         const goodName = cleanStr(params.get("goodName"));
         const partner = cleanStr(params.get("partner"));
 
-        const itemId = cleanStr(params.get("itemId"));
-        const ItemID = cleanStr(params.get("ItemID")); // legacy alias
-        const itemIdValue = itemId || ItemID;
+        // NEW: stock range
+        const stockMin = toFloat(params.get("stockMin"), null);
+        const stockMax = toFloat(params.get("stockMax"), null);
 
+        // Date filters
         const date = params.get("Date");
         const dateFrom = params.get("dateFrom");
         const dateTo = params.get("dateTo");
 
+        // Price filters
         const priceIn = toFloat(params.get("priceIn"), null);
         const priceMin = toFloat(params.get("priceMin"), null);
         const priceMax = toFloat(params.get("priceMax"), null);
 
-        const qttyMin = toFloat(params.get("qttyMin"), null);
-        const qttyMax = toFloat(params.get("qttyMax"), null);
-
-        // deliverysum filters (legacy) -> ще филтрираме по last_delivery_qty
+        // Delivery qty filters (legacy)
         const deliveryMin = toFloat(params.get("deliveryMin"), null);
         const deliveryMax = toFloat(params.get("deliveryMax"), null);
-        
-        // ------- Prisma where for Product -------
+
+        // ---------------- WHERE ----------------
         const where = {};
 
         if (selectedDistributorId !== null) {
@@ -118,12 +118,14 @@ export async function GET(request) {
             where.distributor = { name: { contains: partner, mode: "insensitive" } };
         }
 
-        if (itemIdValue) {
-            // в Mongo беше точно съвпадение
-            where.item_id = itemIdValue;
+        // Stock range
+        if (stockMin !== null || stockMax !== null) {
+            where.stock = {};
+            if (stockMin !== null) where.stock.gte = stockMin;
+            if (stockMax !== null) where.stock.lte = stockMax;
         }
 
-        // Date / dateFrom / dateTo — ще ги вържем към last_restocked_at (логично за products)
+        // Date filters → last_restocked_at
         if (date) {
             const r = parseDayRangeUTC(date);
             if (r) where.last_restocked_at = { gte: r.start, lte: r.end };
@@ -133,9 +135,8 @@ export async function GET(request) {
             if (dateTo) where.last_restocked_at.lte = new Date(dateTo);
         }
 
-        // PriceIN
+        // Price filters
         if (priceIn !== null) {
-            // Mongo: exact match
             where.delivery_price = priceIn;
         } else if (priceMin !== null || priceMax !== null) {
             where.delivery_price = {};
@@ -143,15 +144,7 @@ export async function GET(request) {
             if (priceMax !== null) where.delivery_price.lte = priceMax;
         }
 
-        // Qtty -> stock
-        if (qttyMin !== null || qttyMax !== null) {
-            where.stock = {};
-            if (qttyMin !== null) where.stock.gte = qttyMin;
-            if (qttyMax !== null) where.stock.lte = qttyMax;
-        }
-
-        // 1) взимаме ВСИЧКИ matching продукти (за да сортираме глобално red/yellow/other)
-        // ако по-нататък стане много голямо — ще го оптимизираме със SQL DISTINCT ON + CASE + LIMIT/OFFSET
+        // ---------------- FETCH PRODUCTS ----------------
         const matched = await prisma.products.findMany({
             where,
             orderBy: { updated_at: "desc" },
@@ -162,23 +155,26 @@ export async function GET(request) {
 
         const total = matched.length;
 
-        // 2) last delivery за всеки product_id
+        // ---------------- LAST DELIVERY OPS ----------------
         const productIds = matched.map((p) => p.product_id);
 
         const lastOps = productIds.length
             ? await prisma.operations.findMany({
-                where: { product_id: { in: productIds } },
-                orderBy: [{ product_id: "asc" }, { date: "desc" }],
-                select: { product_id: true, quantity: true, date: true },
-            })
+                  where: {
+                      product_id: { in: productIds },
+                      operation_type: "delivery",
+                  },
+                  orderBy: [{ product_id: "asc" }, { date: "desc" }],
+                  select: { product_id: true, quantity: true, date: true },
+              })
             : [];
 
         const lastByProductId = new Map();
         for (const op of lastOps) {
             if (!lastByProductId.has(op.product_id)) lastByProductId.set(op.product_id, op);
         }
-        
-        // 3) enrich + legacy aliases (за да не пипаш page.jsx)
+
+        // ---------------- ENRICH ----------------
         const enriched = matched.map((p) => {
             const last = lastByProductId.get(p.product_id) || null;
 
@@ -187,12 +183,11 @@ export async function GET(request) {
 
             let percent = last && lastQty > 0 ? Math.round((stock / lastQty) * 100) : null;
             if (percent !== null) percent = Math.max(0, Math.min(100, percent));
-            const color = getColor(percent);
 
+            const color = getColor(percent);
             const partnerName = p.distributor?.name ?? null;
 
             return {
-                // ---- original (new world) ----
                 ...p,
                 distributor_name: partnerName,
                 last_delivery_qty: last ? lastQty : null,
@@ -200,7 +195,7 @@ export async function GET(request) {
                 stock_percent: percent,
                 color,
 
-                // ---- legacy keys (old world) ----
+                // legacy
                 GoodName: p.product_name,
                 Partner: partnerName,
                 PriceIN: p.delivery_price ?? null,
@@ -212,7 +207,7 @@ export async function GET(request) {
             };
         });
 
-        // 4) deliverysum filters (legacy) – прилагаме ги СЛЕД като имаме last_delivery_qty
+        // ---------------- DELIVERY FILTER ----------------
         let filtered = enriched;
         if (deliveryMin !== null || deliveryMax !== null) {
             filtered = filtered.filter((x) => {
@@ -224,48 +219,34 @@ export async function GET(request) {
             });
         }
 
-        // total след delivery filters (за да е честно към UI)
         const totalAfter = filtered.length;
 
-        // 5) Stats (като Mongo aggregate)
-        // min/max за PriceIN, Qtty, Delivery
-        let minPrice = Infinity,
-            maxPrice = -Infinity,
-            minQtty = Infinity,
-            maxQtty = -Infinity,
-            minDelivery = Infinity,
-            maxDelivery = -Infinity;
+        // ---------------- STOCK RANGE CALC ----------------
+        let minStock = Infinity;
+        let maxStock = -Infinity;
 
-        for (const x of filtered) {
-            const price = x.PriceIN;
-            if (typeof price === "number" && Number.isFinite(price)) {
-                if (price < minPrice) minPrice = price;
-                if (price > maxPrice) maxPrice = price;
-            }
+        let minPrice = Infinity;
+        let maxPrice = -Infinity;
 
-            const qtty = Number(x.Qtty ?? 0);
-            if (Number.isFinite(qtty)) {
-                if (qtty < minQtty) minQtty = qtty;
-                if (qtty > maxQtty) maxQtty = qtty;
-            }
 
-            const del = x.deliverysum;
-            if (typeof del === "number" && Number.isFinite(del)) {
-                if (del < minDelivery) minDelivery = del;
-                if (del > maxDelivery) maxDelivery = del;
-            }
+        for (const p of matched) {
+            const s = Number(p.stock ?? 0);
+            if (s < minStock) minStock = s;
+            if (s > maxStock) maxStock = s;
+
+            const price = Number(p.delivery_price ?? 0);
+            if (price < minPrice) minPrice = price;
+            if (price > maxPrice) maxPrice = price;
         }
 
-        const stats = {
-            minPrice: minPrice === Infinity ? 0 : minPrice,
-            maxPrice: maxPrice === -Infinity ? 0 : maxPrice,
-            minQtty: minQtty === Infinity ? 0 : minQtty,
-            maxQtty: maxQtty === -Infinity ? 0 : maxQtty,
-            minDelivery: minDelivery === Infinity ? 0 : minDelivery,
-            maxDelivery: maxDelivery === -Infinity ? 0 : maxDelivery,
-        };
+        if (minStock === Infinity) minStock = 0;
+        if (maxStock === -Infinity) maxStock = 0;
 
-        // 6) Global sort: red -> yellow -> other, after that by % asc, then by name
+        if (minPrice === Infinity) minPrice = 0;
+        if (maxPrice === -Infinity) maxPrice = 0;
+
+
+        // ---------------- SORT ----------------
         filtered.sort((a, b) => {
             const r = colorRank(a.color) - colorRank(b.color);
             if (r !== 0) return r;
@@ -277,7 +258,7 @@ export async function GET(request) {
             return String(a.product_name || "").localeCompare(String(b.product_name || ""), "bg");
         });
 
-        // 7) pagination (както беше: skip/limit)
+        // ---------------- PAGINATION ----------------
         const results = filtered.slice(skip, skip + limit);
 
         return new Response(
@@ -288,7 +269,10 @@ export async function GET(request) {
                 total: totalAfter,
                 limit,
                 skip,
-                stats,
+                minStock,
+                maxStock,
+                minPrice,
+                maxPrice,
                 selectedDistributorId,
             }),
             { status: 200 }

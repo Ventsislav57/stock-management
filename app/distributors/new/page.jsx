@@ -69,22 +69,22 @@ export default function NewDistributorPage() {
             <SideNav />
 
             <div className="p-10 w-full space-y-10 h-screen overflow-auto">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-4xl font-bold">Нов дистрибутор</h1>
-                        <p className="mt-2">
-                            Въведи информация за нов партньор, който ще бъде използван при доставки, продажби и справки.
-                        </p>
-                    </div>
-                    <button
-                        onClick={submit}
-                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl text-lg font-semibold shadow-lg transition cursor-pointer"
-                    >
-                        Запази дистрибутора
-                    </button>
-                </div>
 
-                <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 shadow-xl space-y-8">
+                <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 shadow-xl space-y-3">
+                    <div className="flex justify-between items-center border-b-2 pb-2">
+                        <div>
+                            <h1 className="text-4xl font-bold">Нов дистрибутор</h1>
+                            <p className="mt-2">
+                                Въведи информация за нов партньор, който ще бъде използван при доставки, продажби и справки.
+                            </p>
+                        </div>
+                        <button
+                            onClick={submit}
+                            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl text-lg font-semibold shadow-lg transition cursor-pointer"
+                        >
+                            Запази дистрибутора
+                        </button>
+                    </div>
 
                     <div className="border-b-2 pb-10">
                         <h2 className="text-xl font-semibold mb-4">Основна информация</h2>

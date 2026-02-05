@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 /**
  * Client payload:
  * { reports: [ { operation_type, code, acct, date, product_id, product_name, measure,
- *               partner_id, partner_name, location_id, location_name,
+ *               distributor_id, partner_name, location_id, location_name,
  *               user_id, user_name, quantity, price, vat, total, partner, note, raw_xml } ] }
  */
 
@@ -49,6 +49,9 @@ async function getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerNam
         select: { id: true },
     });
 
+    console.log(dist);
+    
+
     return dist.id;
 }
 
@@ -57,14 +60,7 @@ async function getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerNam
  * - if exists: stock += quantity, update last price/partner/date/name
  * - if not: create with initial stock = quantity
  */
-async function upsertProductOnDelivery({
-                                           product_id,
-                                           product_name,
-                                           distributor_id,
-                                           quantity,
-                                           price,
-                                           date,
-                                       }) {
+async function upsertProductOnDelivery({ product_id, product_name, distributor_id, quantity, price, date }) {
     // product_id is required; quantity may be 0, but delivery with 0 makes no sense; still allowed.
     if (!product_id) return;
 
@@ -117,8 +113,8 @@ function coerceClientReport(r) {
     const product_name = cleanStr(r.product_name, "");
     const measure = r.measure === null ? null : cleanStr(r.measure, null);
 
-    // client sends partner_id; DB uses distributor_id (but we still convert via getOrCreateDistributorIdByExternalPartnerId)
-    const distributor_id = toNumber(r.partner_id, null);
+    // client sends distributor_id; DB uses distributor_id (but we still convert via getOrCreateDistributorIdByExternalPartnerId)
+    const distributor_id = toNumber(r.distributor_id, null);
     const location_id = toNumber(r.location_id, null);
     const location_name = cleanStr(r.location_name, "");
 
@@ -197,10 +193,14 @@ export async function POST(req) {
 
             const item = coerced.data;
 
-            // Resolve/Upsert distributor by external_partner_id (partner_id from XML)
-            const partnerId = raw.partner_id ?? null;
+            // Resolve/Upsert distributor by external_partner_id (distributor_id from XML)
+            const partnerId = raw.distributor_id ?? null;
             const partnerName = raw.partner_name ?? raw.partner ?? null;
+            console.log('before -> ', item.distributor_id);
+            
             item.distributor_id = await getOrCreateDistributorIdByExternalPartnerId(partnerId, partnerName);
+            console.log('after -> ', item.distributor_id);
+            
 
             // Match existing operation (same logic you already used)
             const existing = await prisma.operations.findFirst({

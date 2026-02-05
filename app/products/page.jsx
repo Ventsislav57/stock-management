@@ -18,23 +18,31 @@ export default function Products() {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [productDetails, setProductDetails] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [initialized, setInitialized] = useState(false);
+
+    const [stockRange, setStockRange] = useState({ min: 0, max: 0 });
+    const [priceRange, setPriceRange] = useState({ min: 0, max: 0 });
 
     // ✅ NEW: distributor filter (from dropdown)
     const [distributorId, setDistributorId] = useState("");
 
-    const [searchParams, setSearchParams] = useState({
-        productNumber: "",
-        goodName: "",
-        itemId: "", // ✅ FIX: имаш input за itemId, но нямаше state
-        priceIn: "",
-        qttyMin: "",
-        qttyMax: "",
+    const [searchParams, setSearchParams] = useState({ 
+        goodName: "", 
+        stockMin: null, 
+        stockMax: null, 
+        priceMin: null, 
+        priceMax: null, 
         Partner: "",
-        date: "",
+        date: ""
     });
 
     const [min, setMin] = useState(Number(searchParams.qttyMin) || 0);
     const [max, setMax] = useState(Number(searchParams.qttyMax) || 100);
+
+    const [initialStockMin, setInitialStockMin] = useState(0);
+    const [initialStockMax, setInitialStockMax] = useState(0);
+    const [initialPriceMin, setInitialPriceMin] = useState(0);
+    const [initialPriceMax, setInitialPriceMax] = useState(0);
 
     useEffect(() => {
         setCurrentTime(new Date());
@@ -69,24 +77,25 @@ export default function Products() {
             const fetchData = async () => {
                 setLoading(true);
                 try {
-                    const qs = new URLSearchParams({
-                        limit: String(limit),
-                        skip: String(skip),
-
-                        // legacy / current filters
-                        ItemID: searchParams.productNumber, // по твоя API
-                        goodName: searchParams.goodName,
-                        priceIn: searchParams.priceIn,
-                        qttyMin: searchParams.qttyMin,
-                        qttyMax: searchParams.qttyMax,
-                        Date: searchParams.date
-                            ? new Date(searchParams.date).toISOString().split("T")[0]
-                            : "",
-                        partner: searchParams.Partner,
+                    const qs = new URLSearchParams({ 
+                        limit: String(limit), 
+                        skip: String(skip), 
+                        goodName: searchParams.goodName, 
+                        partner: searchParams.Partner, 
+                        Date: searchParams.date ? new Date(searchParams.date).toISOString().split("T")[0] : ""
                     });
 
                     // ✅ NEW: distributorId param
-                    if (distributorId) qs.set("distributorId", distributorId);
+                    if (searchParams.stockMin !== null) 
+                        qs.set("stockMin", searchParams.stockMin);
+                    if (searchParams.stockMax !== null)
+                        qs.set("stockMax", searchParams.stockMax);
+                    if (searchParams.priceMin !== null)
+                        qs.set("priceMin", searchParams.priceMin);
+                    if (searchParams.priceMax !== null)
+                        qs.set("priceMax", searchParams.priceMax);
+                    if (distributorId)
+                        qs.set("distributorId", distributorId);
 
                     // ✅ Ако искаш да ползваш itemId филтъра реално:
                     // (в момента API-то ти гледа itemId/ItemID, но ти вече пращаш ItemID от productNumber)
@@ -101,6 +110,25 @@ export default function Products() {
 
                     setReports(data.results || []);
                     setTotal(data.total || 0);
+                    if (!initialized) {
+                        setInitialStockMin(data.minStock);
+                        setInitialStockMax(data.maxStock);
+                        setInitialPriceMin(data.minPrice);
+                        setInitialPriceMax(data.maxPrice);
+                    
+                        setSearchParams(prev => ({
+                            ...prev,
+                            stockMin: data.minStock,
+                            stockMax: data.maxStock,
+                            priceMin: data.minPrice,
+                            priceMax: data.maxPrice,
+                        }));
+                    
+                        setStockRange({ min: data.minStock, max: data.maxStock });
+                        setPriceRange({ min: data.minPrice, max: data.maxPrice });
+                    
+                        setInitialized(true);
+                    }
 
                     // по желание: ако API върне selectedDistributorId, може да го синхронизираш
                     // if (!distributorId && data.selectedDistributorId) setDistributorId(data.selectedDistributorId);
@@ -115,7 +143,7 @@ export default function Products() {
         }, 500);
 
         return () => clearTimeout(debounceTimeout.current);
-    }, [searchParams, skip, limit, distributorId]); // ✅ добавих distributorId
+    }, [searchParams.goodName, searchParams.Partner, searchParams.date, searchParams.stockMin, searchParams.stockMax, searchParams.priceMin, searchParams.priceMax, skip, limit, distributorId]); // ✅ добавих distributorId
 
     const handleNext = () => {
         if (skip + limit < total) setSkip(skip + limit);
@@ -147,6 +175,26 @@ export default function Products() {
         setProductDetails(null);
     };
 
+
+    const resetFilters = () => {
+        setSearchParams(prev => ({
+            ...prev,
+            goodName: "",
+            productNumber: "",
+            Partner: "",
+            date: "",
+            stockMin: initialStockMin,
+            stockMax: initialStockMax,
+            priceMin: initialPriceMin,
+            priceMax: initialPriceMax,
+        }));
+    
+        setStockRange({ min: initialStockMin, max: initialStockMax });
+        setPriceRange({ min: initialPriceMin, max: initialPriceMax });
+    
+        setSkip(0);
+    };
+    
     return (
         <main className="h-screen w-scree text-white flex flex-col lg:flex-row">
             <SideNav />
@@ -241,35 +289,14 @@ export default function Products() {
                                                 : "text-green-300"
                                     }
                                 >
-                  {productDetails.color?.toUpperCase()}
-                </span>
+                                    {productDetails.color?.toUpperCase()}
+                                </span>
                             </div>
                         </div>
                     </div>
                 ) : (
                     <div className="p-5 lg:p-20 w-full">
                         <div className="flex flex-col xl:flex-row justify-between items-center mb-4 mt-48 md:mt-0 gap-5">
-                            <div className="w-full md:w-1/2 grid grid-cols-1 md:grid-cols-3 gap-5">
-                                <button
-                                    className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"
-                                    onClick={() => setSearchField("product-name")}
-                                >
-                                    <span>Търсене на продукт</span>
-                                </button>
-                                <button
-                                    className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"
-                                    onClick={() => setSearchField("search-by")}
-                                >
-                                    <span>Търсене по ...</span>
-                                </button>
-                                <button
-                                    className="border-2 border-white py-2 w-full rounded-xl cursor-pointer bg-gray-900/90 hover:bg-black/90 hoder:font-bold text-xl"
-                                    onClick={() => setSearchField("search-by")}
-                                >
-                                    <span>Търсене по ...</span>
-                                </button>
-                            </div>
-
                             <div className="text-2xl">
                                 <p>
                                     Дата:{" "}
@@ -296,16 +323,11 @@ export default function Products() {
                                         value={distributorId}
                                         onChange={handleDistributorChange}
                                     />
-
-                                    {/* debug (можеш да го махнеш после) */}
-                                    <div className="text-xs text-white/60">
-                                        distributorId: <span className="text-white">{distributorId || "(default)"}</span>
-                                    </div>
                                 </div>
 
                                 {searchField === "product-name" && (
                                     <div className="col-span-12 flex justify-between gap-y-6 gap-x-4 border-b-2 border-white pb-4 mb-5">
-                                        <div className="grid grid-cols-6 gap-5 w-full">
+                                        <div className="grid grid-cols-6 gap-5 w-full items-center">
                                             <input
                                                 type="text"
                                                 name="productNumber"
@@ -324,60 +346,36 @@ export default function Products() {
                                                 className="border p-2 rounded bg-transparent text-white placeholder:text-white/60"
                                             />
 
-                                            <input
-                                                type="text"
-                                                name="itemId"
-                                                placeholder="Item ID"
-                                                value={searchParams.itemId}
-                                                onChange={handleSearchChange}
-                                                className="border p-2 rounded bg-transparent text-white placeholder:text-white/60"
+                                            <DualSlider
+                                                label="Наличност"
+                                                min={searchParams.stockMin}
+                                                max={searchParams.stockMax}
+                                                valueMin={stockRange.min}
+                                                valueMax={stockRange.max}
+                                                onChangeTemp={setStockRange}
+                                                onCommit={() =>
+                                                    setSearchParams(p => ({
+                                                        ...p,
+                                                        stockMin: stockRange.min,
+                                                        stockMax: stockRange.max,
+                                                    }))
+                                                }
                                             />
 
-                                            {/* Slider (min/max stock) */}
-                                            <div className="w-full px-4 h-full">
-                                                <div className="relative h-1 bg-slate-200 rounded-full">
-                                                    <div
-                                                        className="absolute h-full bg-slate-800 rounded-full"
-                                                        style={{
-                                                            left: `${min}%`,
-                                                            width: `${max - min}%`,
-                                                        }}
-                                                    ></div>
-
-                                                    <input
-                                                        type="range"
-                                                        min={0}
-                                                        max={100}
-                                                        value={min}
-                                                        onChange={(e) => setMin(Number(e.target.value))}
-                                                        className="absolute w-full appearance-none bg-transparent h-1"
-                                                        style={{ zIndex: 20 }}
-                                                    />
-
-                                                    <input
-                                                        type="range"
-                                                        min={0}
-                                                        max={100}
-                                                        value={max}
-                                                        onChange={(e) => setMax(Number(e.target.value))}
-                                                        className="absolute w-full appearance-none bg-transparent h-1"
-                                                        style={{ zIndex: 10 }}
-                                                    />
-                                                </div>
-
-                                                <div className="flex justify-between text-sm mt-2 text-gray-300">
-                                                    <span>Мин: {min}</span>
-                                                    <span>Макс: {max}</span>
-                                                </div>
-                                            </div>
-
-                                            <input
-                                                type="text"
-                                                name="Partner"
-                                                placeholder="Партньор"
-                                                value={searchParams.Partner}
-                                                onChange={handleSearchChange}
-                                                className="border p-2 rounded bg-transparent text-white placeholder:text-white/60"
+                                            <DualSlider
+                                                label="Цена"
+                                                min={searchParams.priceMin}
+                                                max={searchParams.priceMax}
+                                                valueMin={priceRange.min}
+                                                valueMax={priceRange.max}
+                                                onChangeTemp={setPriceRange}
+                                                onCommit={() =>
+                                                    setSearchParams(p => ({
+                                                        ...p,
+                                                        priceMin: priceRange.min,
+                                                        priceMax: priceRange.max,
+                                                    }))
+                                                }
                                             />
 
                                             <input
@@ -387,6 +385,11 @@ export default function Products() {
                                                 onChange={handleSearchChange}
                                                 className="border p-2 rounded bg-transparent text-white placeholder:text-white/60"
                                             />
+
+                                            <button onClick={resetFilters} className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition cursor-pointer" >
+                                                Рестартирай филтрите
+                                            </button> 
+
                                         </div>
                                     </div>
                                 )}
@@ -434,10 +437,10 @@ export default function Products() {
                                             <span>{p.product_name}</span>
                                         </div>
                                         <div className="col-span-2 border-r-2 border-white text-center">
-                      <span>
-                        {Number(p.stock ?? 0)}
-                          {p.stock_percent != null ? ` (${p.stock_percent}%)` : ""}
-                      </span>
+                                            <span>
+                                                {Number(p.stock ?? 0)}
+                                                {p.stock_percent != null ? ` (${p.stock_percent}%)` : ""}
+                                            </span>
                                         </div>
                                         <div className="col-span-2 border-r-2 border-white text-center">
                                             <span>{p.delivery_price != null ? `${Number(p.delivery_price).toFixed(2)} лв.` : "-"}</span>
@@ -469,8 +472,8 @@ export default function Products() {
                                     Назад
                                 </button>
                                 <span>
-                  Страница {currentPage} от {totalPages}
-                </span>
+                                    Страница {currentPage} от {totalPages}
+                                </span>
                                 <button
                                     onClick={handleNext}
                                     disabled={currentPage === totalPages}
@@ -499,5 +502,75 @@ export default function Products() {
                 )}
             </div>
         </main>
+    );
+}
+
+
+function DualSlider({ label, min, max, valueMin, valueMax, onChangeTemp, onCommit }) {
+    const safeMin = Number.isFinite(min) ? min : 0;
+    const safeMax = Number.isFinite(max) ? max : safeMin + 1;
+    const safeValueMin = Number.isFinite(valueMin) ? valueMin : safeMin;
+    const safeValueMax = Number.isFinite(valueMax) ? valueMax : safeMax;
+
+    const round2 = (n) => Number(Number(n).toFixed(2));
+
+    const range = safeMax - safeMin || 1;
+
+    const leftPercent = ((safeValueMin - safeMin) / range) * 100;
+    const rightPercent = ((safeValueMax - safeMin) / range) * 100;
+
+    const handleMin = (e) => {
+        const v = round2(Number(e.target.value));
+        if (v <= safeValueMax) onChangeTemp({ min: v, max: safeValueMax });
+    };
+
+    const handleMax = (e) => {
+        const v = round2(Number(e.target.value));
+        if (v >= safeValueMin) onChangeTemp({ min: safeValueMin, max: v });
+    };
+
+    return (
+        <div className="w-full px-4 select-none">
+            <label className="text-white/80 text-sm mb-1 block">{label}</label>
+
+            <div className="relative h-2 bg-slate-700 rounded-full">
+                <div
+                    className="absolute h-full bg-blue-500 rounded-full transition-all"
+                    style={{
+                        left: `${leftPercent}%`,
+                        width: `${rightPercent - leftPercent}%`,
+                    }}
+                ></div>
+
+                <input
+                    type="range"
+                    min={safeMin}
+                    max={safeMax}
+                    step="1"
+                    value={safeValueMin}
+                    onChange={handleMin}
+                    onMouseUp={onCommit}
+                    className="absolute w-full appearance-none bg-transparent h-2 pointer-events-auto"
+                    style={{ zIndex: 30 }}
+                />
+
+                <input
+                    type="range"
+                    min={safeMin}
+                    max={safeMax}
+                    step="1"
+                    value={safeValueMax}
+                    onChange={handleMax}
+                    onMouseUp={onCommit}
+                    className="absolute w-full appearance-none bg-transparent h-2 pointer-events-auto"
+                    style={{ zIndex: 20 }}
+                />
+            </div>
+
+            <div className="flex justify-between text-sm mt-2 text-gray-300">
+                <span>Мин: {round2(safeValueMin)}</span>
+                <span>Макс: {round2(safeValueMax)}</span>
+            </div>
+        </div>
     );
 }

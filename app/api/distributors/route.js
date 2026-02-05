@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
     try {
         const items = await prisma.distributors.findMany({
-            select: { id: true, name: true },
+            select: { id: true, name: true, city: true, phone: true, email: true, bulstat: true },
             orderBy: { name: "asc" },
         });
 
