@@ -128,3 +128,38 @@ model products {
   @@index([stock])
   @@index([last_restocked_at])
 }
+
+model sale {
+  id                String   @id @default(cuid())
+
+  itemId            String   // ItemID от Microinvest
+  codeSort          String   @default("")
+  acct              String   @default("")
+  date              DateTime @default(now())
+
+  operTypeInvisible String   // "2" = продажба
+  goodName          String   @default("")
+  partnerId         String   @default("")
+  locationId        String   @default("")
+  operatorId        String   @default("")
+
+  priceOut          Float    @default(0)
+  vatOut1           Float    @default(0)
+  saleSum           Float    @default(0)
+  vatOut            Float    @default(0)
+
+  priceIn           Float    @default(0)
+  vatIn1            Float    @default(0)
+  deliverySum       Float    @default(0)
+  vatIn             Float    @default(0)
+
+  profit            Float    @default(0)
+  isTotal           Int      @default(0)
+
+  qtty              Int      @default(1) // колко е продадено в този ред
+
+  createdAt         DateTime @default(now())
+
+  @@index([itemId])
+  @@index([date])
+}

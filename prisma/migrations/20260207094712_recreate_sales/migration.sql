@@ -1,0 +1,33 @@
+-- CreateTable
+CREATE TABLE "sale" (
+    "id" TEXT NOT NULL,
+    "itemId" TEXT NOT NULL,
+    "codeSort" TEXT NOT NULL DEFAULT '',
+    "acct" TEXT NOT NULL DEFAULT '',
+    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "operTypeInvisible" TEXT NOT NULL,
+    "goodName" TEXT NOT NULL DEFAULT '',
+    "partnerId" TEXT NOT NULL DEFAULT '',
+    "locationId" TEXT NOT NULL DEFAULT '',
+    "operatorId" TEXT NOT NULL DEFAULT '',
+    "priceOut" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "vatOut1" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "saleSum" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "vatOut" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "priceIn" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "vatIn1" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "deliverySum" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "vatIn" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "profit" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "isTotal" INTEGER NOT NULL DEFAULT 0,
+    "qtty" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "sale_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "sale_itemId_idx" ON "sale"("itemId");
+
+-- CreateIndex
+CREATE INDEX "sale_date_idx" ON "sale"("date");
